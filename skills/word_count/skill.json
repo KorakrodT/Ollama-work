@@ -1,0 +1,12 @@
+{
+  "name": "word_count",
+  "description": "นับจำนวนคำ ตัวอักษร และบรรทัดของข้อความ",
+  "type": "code",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "text": { "type": "string", "description": "ข้อความที่จะนับ" }
+    },
+    "required": ["text"]
+  }
+}

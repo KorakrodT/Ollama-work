@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  test:
+    # รันบน Windows เป็นหลัก เพราะแอปนี้เป็น native window (.exe) ของ Windows
+    # และเป็นที่ที่บั๊ก 'charmap'/encoding โผล่จริง
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pip-audit ruff
+          pip install -r requirements.txt
+
+      - name: Dependency audit (TEST-2)
+        # เช็ค CVE ที่รู้จักของ dependency จริง (pywebview/pythonnet ฯลฯ) — ไม่ดัก
+        # malicious/typosquatted package ใหม่เอี่ยม แต่จับ known-CVE ได้
+        run: pip-audit -r requirements.txt
+
+      - name: Lint (pyflakes rules via ruff) — catches scope-shadowing bugs
+        # F823 "local variable referenced before assignment" คือกฎที่จับบั๊กจริงที่เจอ
+        # 1 ก.ค. 2026: main() มี `import time` ซ้ำในฟังก์ชันเดียวกับที่ใช้ time.time()
+        # ไปแล้วก่อนหน้า ทำให้ Python มองว่า time เป็น local -> UnboundLocalError ทุกครั้ง
+        # ที่เรียก main() — compileall/pytest ตอนนั้นจับไม่ได้เพราะไม่มี syntax error และ
+        # ไม่มี test เรียก main() ตรงๆ (เปิดหน้าต่างจริง เขียน test ตรงไม่คุ้ม) ตัว lint
+        # นี้จับ pattern นี้ได้แบบ static ไม่ต้องรันโค้ดจริงเลย
+        run: python -m ruff check --select F server.py tools.py agents.py agent_store.py data_store.py skills_loader.py mcp_client.py knowledge_store.py winproc.py
+
+      - name: Compile-check (จับ SyntaxError/ไฟล์ truncate ก่อน build)
+        # ครอบทุกโมดูลซอร์ส รวม mcp_client.py / knowledge_store.py ที่เพิ่มมาทีหลัง
+        # (ไฟล์ที่ตกหล่นจาก compile-check คือไฟล์ที่อาจ truncate แล้วหลุดรอดไปได้)
+        run: python -m compileall -q server.py tools.py agents.py agent_store.py data_store.py skills_loader.py mcp_client.py knowledge_store.py
+
+      - name: Smoke tests
+        run: python -m pytest tests/ -q

@@ -1,0 +1,13 @@
+# แอปคุยกับโมเดลผ่าน LM Studio (OpenAI-compatible) ด้วย urllib ในไลบรารีมาตรฐาน
+# จึงไม่ต้องใช้แพ็กเกจ client เพิ่ม
+pywebview>=5.0,<6.0
+# จำเป็นบน Windows: pywebview backend edgechromium เรียกใช้ผ่าน .NET (clr)
+pythonnet>=3.0,<4.0 ; sys_platform == "win32"
+
+# DOC-1: ใช้จริงใน server.py -> start_tray() สำหรับไอคอนในถาดระบบ (system tray) +
+# global hotkey (Ctrl+Alt+Space) — ไม่มีก็ยังรันแอปหลักได้ปกติ แค่ไม่มีฟีเจอร์นี้
+# (เดิมไม่ได้ประกาศไว้ที่นี่ ทำให้ผู้ใช้ที่ติดตั้งตาม README/AGENTS.md ไม่มีฟีเจอร์นี้
+# แบบเงียบๆ เพราะ error ถูก except แล้ว print เฉยๆ)
+pystray>=0.19,<1.0 ; sys_platform == "win32"
+keyboard>=0.13,<1.0 ; sys_platform == "win32"
+Pillow>=10.0

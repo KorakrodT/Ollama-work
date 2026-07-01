@@ -1,0 +1,30 @@
+{
+  "name": "image_gen_router",
+  "description": "สร้างภาพจาก prompt โดยเลือก backend ที่ผู้ใช้ต้องการ: GPT/OpenAI/ChatGPT/Codex ให้ใช้ backend=gpt, Gemini/Google/agy ให้ใช้ backend=gemini. ถ้าผู้ใช้ไม่ได้ระบุ backend ให้ถามก่อนเสมอว่าจะใช้ gpt หรือ gemini แล้วค่อยเรียก tool. Skill นี้ไม่ต้องใช้ API key แต่เครื่องต้องติดตั้งและ login CLI ที่เกี่ยวข้องก่อน: codex สำหรับ gpt หรือ agy สำหรับ gemini.",
+  "type": "code",
+  "category": "Image",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "description": "คำบรรยายภาพที่ต้องการสร้าง"
+      },
+      "backend": {
+        "type": "string",
+        "enum": ["gpt", "gemini"],
+        "description": "เลือก backend: gpt สำหรับ Codex/OpenAI หรือ gemini สำหรับ agy/Gemini. ถ้าผู้ใช้ไม่ระบุ ให้ถามก่อนเรียก tool"
+      },
+      "out": {
+        "type": "string",
+        "description": "path ไฟล์ .png หรือโฟลเดอร์ปลายทาง (optional). รองรับ ~ บน Windows"
+      },
+      "timeout": {
+        "type": "integer",
+        "description": "เวลารอ backend หน่วยวินาที (default 600)",
+        "default": 600
+      }
+    },
+    "required": ["prompt", "backend"]
+  }
+}

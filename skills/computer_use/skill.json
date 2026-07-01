@@ -1,0 +1,28 @@
+{
+  "name": "computer_use",
+  "description": "Interact with the local computer via mouse, keyboard, and screen captures. Use to manipulate UI or get a screenshot.",
+  "type": "code",
+  "category": "System",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "description": "Action to perform: 'screenshot', 'mouse_move', 'mouse_click', 'keyboard_type'"
+      },
+      "x": {
+        "type": "integer",
+        "description": "X coordinate for mouse operations (optional)"
+      },
+      "y": {
+        "type": "integer",
+        "description": "Y coordinate for mouse operations (optional)"
+      },
+      "text": {
+        "type": "string",
+        "description": "Text to type for 'keyboard_type' (optional)"
+      }
+    },
+    "required": ["action"]
+  }
+}

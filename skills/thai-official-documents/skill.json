@@ -1,0 +1,6 @@
+{
+  "name": "thai-official-documents",
+  "description": "ความรู้และซอร์สโค้ดจากโฟลเดอร์ thai-official-documents",
+  "type": "prompt",
+  "prompt": "prompt.md"
+}

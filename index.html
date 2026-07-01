@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LM Co-work</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root{
+    /* Cool blue-slate dark palette (accent = blue) */
+    --bg:#0E131C; --panel:#171E2A; --panel-2:#212A38; --panel-3:#2B3547;
+    --border:#293344; --border-soft:#1E2735;
+    --text:#E6EAF2; --muted:#9BA3B4; --muted-2:#6B7385;
+    --accent:#3B82F6; --accent-600:#2563EB; --accent-soft:rgba(59,130,246,.15);
+    --green:#84B87C; --green-soft:rgba(132,184,124,.14);
+    --red:#DC5A4E; --red-soft:rgba(220,90,78,.14);
+    --amber:#E0A85B; --amber-soft:rgba(224,168,91,.14);
+    --code:#0B0F17; --user:#232D3D;
+    --radius:14px; --radius-sm:10px;
+    --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+    --serif:"Source Serif 4",Georgia,"Noto Serif Thai","Sarabun",serif;
+    --shadow:0 10px 40px rgba(0,0,0,.42);
+    --ease:cubic-bezier(.4,0,.2,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:"Inter","Segoe UI","Noto Sans Thai",system-ui,sans-serif;
+    background:var(--bg); color:var(--text); font-size:14.5px; overflow:hidden;
+    -webkit-font-smoothing:antialiased;}
+  body,.msg,.md,input,textarea,pre,code,.tree,.chat-title{-webkit-user-select:text;user-select:text}
+  button,.tab,.navitem,.icon-btn,.chip,.badge{-webkit-user-select:none;user-select:none}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#2f3a4d;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+  ::-webkit-scrollbar-thumb:hover{background:#3b4759;background-clip:content-box}
+  ::-webkit-scrollbar-track{background:transparent}
+  /* inline SVG line-icons (แทน emoji) */
+  svg.ico{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;display:inline-block;vertical-align:middle}
+  .tab svg.ico,.row svg.ico,.skill svg.ico,.tbadge svg.ico{width:15px;height:15px}
+  .brand .logo svg,.msg .av svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .msg.user .av svg{stroke:var(--muted)}
+
+  /* ===== App grid ===== */
+  .app{display:grid; grid-template-columns:260px 1fr 0px; height:100vh; transition:grid-template-columns .22s ease}
+  .app.no-left{grid-template-columns:0px 1fr 0px}
+  .app.show-right{grid-template-columns:260px 1fr 400px}
+  .app.no-left.show-right{grid-template-columns:0px 1fr 400px}
+
+  /* ===== Sidebar ===== */
+  .sidebar{background:#0B0F17; border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; min-width:0}
+  .brand{display:flex; align-items:center; gap:10px; padding:16px 16px 12px; flex-shrink:0}
+  .brand .logo{width:30px;height:30px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    font-size:16px;background:linear-gradient(150deg,#2563EB,#60A5FA);box-shadow:0 3px 12px rgba(37,99,235,.38)}
+  .brand b{font-size:15px;font-weight:600;letter-spacing:.2px}
+  .brand small{display:block;color:var(--muted-2);font-size:11px;font-weight:500}
+
+  .newchat{margin:0 12px 12px;padding:11px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));color:var(--text);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:600;transition:.15s;flex-shrink:0}
+  .newchat:hover{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent-soft)}
+
+  .tabs{display:flex;gap:4px;margin:0 12px 10px;background:var(--bg);border:1px solid var(--border-soft);
+    border-radius:10px;padding:4px;flex-shrink:0}
+  .tab{flex:1;padding:7px 0;border:none;background:transparent;color:var(--muted);font-size:12.5px;font-weight:600;
+    border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.14s}
+  .tab.active{background:var(--panel-3);color:var(--text)}
+  .tab:hover:not(.active){color:var(--text)}
+
+  .pane{flex:1;overflow-y:auto;padding:0 8px 8px;min-height:0}
+  .pane[hidden]{display:none}
+
+  .recent{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;cursor:pointer;margin-bottom:2px;
+    color:var(--muted);transition:.1s}
+  .recent:hover{background:var(--panel);color:var(--text)}
+  .recent.active{background:var(--panel);color:var(--text);box-shadow:inset 3px 0 0 var(--accent)}
+  .recent .ti{flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .recent .del{opacity:0;color:var(--muted-2);font-size:13px;flex-shrink:0;padding:2px}
+  .recent:hover .del{opacity:.7} .recent .del:hover{opacity:1;color:var(--red)}
+  .empty{padding:14px 12px;color:var(--muted-2);font-size:12.5px;text-align:center;line-height:1.6}
+
+  /* Files tree */
+  .ws-head{display:flex;align-items:center;gap:6px;padding:6px 8px 10px}
+  .ws-path{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg);
+    border:1px solid var(--border-soft);border-radius:7px;padding:6px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tree{font-size:13px}
+  .row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer;color:var(--muted)}
+  .row:hover{background:var(--panel);color:var(--text)}
+  .row .ic{width:16px;text-align:center;flex-shrink:0}
+  .row .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .sz{font-size:10.5px;color:var(--muted-2);font-family:var(--mono)}
+  .row.up{color:var(--accent)}
+
+  /* Skills */
+  .skill{display:flex;gap:9px;align-items:flex-start;padding:9px 10px;border-radius:9px;margin-bottom:3px;background:var(--panel)}
+  .skill .si{font-size:15px;flex-shrink:0}
+  .skill .sn{font-size:12.5px;font-weight:600}
+  .skill .sd{color:var(--muted);font-size:11px;line-height:1.4;margin-top:2px}
+  .skill .stype{font-size:9.5px;font-family:var(--mono);color:var(--accent);text-transform:uppercase}
+  .skill.err .sn{color:var(--red)}
+
+  .side-foot{border-top:1px solid var(--border);padding:10px 12px;flex-shrink:0;display:flex;gap:8px;align-items:center}
+  .side-foot .fbtn{flex:1;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:8px;
+    padding:8px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.14s}
+  .side-foot .fbtn:hover{color:var(--text);border-color:var(--accent)}
+
+  /* ===== Main ===== */
+  .main{display:flex;flex-direction:column;min-width:0;position:relative;background:var(--bg)}
+  .topbar{height:56px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--border-soft);
+    flex-shrink:0;background:rgba(14,19,28,.82);backdrop-filter:blur(10px);z-index:5}
+  .icon-btn{width:34px;height:34px;border:1px solid var(--border);background:var(--panel);border-radius:9px;color:var(--muted);
+    cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:.14s;flex-shrink:0}
+  .icon-btn:hover{color:var(--text);border-color:var(--accent)}
+  .icon-btn.on{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+  .sel{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:8px 10px;
+    font-size:13px;font-family:inherit;cursor:pointer;max-width:210px;transition:.14s}
+  .sel:hover{border-color:var(--accent)} .sel:focus{outline:none;border-color:var(--accent)}
+  .spacer{flex:1}
+
+  /* toggle switch */
+  .toggle{display:flex;align-items:center;gap:9px;padding:6px 12px;border:1px solid var(--border);border-radius:10px;
+    background:var(--panel);cursor:pointer;transition:.15s;font-size:12.5px;font-weight:600;color:var(--muted)}
+  .toggle.on{border-color:var(--green);color:var(--green);background:var(--green-soft)}
+  .sw{width:34px;height:19px;border-radius:20px;background:#3a4456;position:relative;transition:.2s var(--ease);flex-shrink:0}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#c8cede;transition:.2s var(--ease)}
+  .toggle.on .sw{background:var(--green)} .toggle.on .sw::after{left:17px;background:#0E131C}
+
+  /* Message feed */
+  .feed{flex:1;overflow-y:auto;scroll-behavior:smooth;padding:22px 0 30px}
+  .feed-inner{max-width:800px;margin:0 auto;padding:0 22px;display:flex;flex-direction:column;gap:22px}
+  .welcome{margin:8vh auto 0;text-align:center;color:var(--muted);max-width:520px}
+  .welcome .wlogo{width:56px;height:56px;border-radius:16px;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;
+    font-size:28px;background:linear-gradient(150deg,#2563EB,#60A5FA);box-shadow:0 8px 26px rgba(37,99,235,.38)}
+  .welcome h2{color:var(--text);font-size:21px;font-weight:600;margin-bottom:8px}
+  .welcome p{font-size:14px;line-height:1.7}
+  .suggest{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:20px}
+  .suggest button{background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:20px;
+    padding:8px 15px;font-size:12.5px;cursor:pointer;transition:.14s}
+  .suggest button:hover{color:var(--text);border-color:var(--accent)}
+
+  .msg{display:flex;gap:13px;align-items:flex-start;animation:msgIn .32s var(--ease)}
+  @keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .msg .av{width:30px;height:30px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .msg.ai .av{background:linear-gradient(150deg,#2563EB,#60A5FA);box-shadow:0 2px 8px rgba(37,99,235,.32)}
+  .msg.user{flex-direction:row-reverse}
+  .msg.user .av{background:var(--panel-3);color:var(--muted)}
+  .msg .body{min-width:0;max-width:100%}
+  .msg.user .body{background:var(--user);border:1px solid var(--border);border-radius:14px 4px 14px 14px;padding:11px 15px;line-height:1.6}
+  .msg.ai .body{padding-top:3px}
+  .msg.user .wrap{display:flex;justify-content:flex-end}
+
+  /* Markdown — AI voice in serif (แบบ Claude) */
+  .md{font-family:var(--serif);line-height:1.75;font-size:16px;word-wrap:break-word;overflow-wrap:anywhere;color:var(--text)}
+  .md>*:first-child{margin-top:0} .md>*:last-child{margin-bottom:0}
+  .md h1,.md h2,.md h3{margin:18px 0 9px;font-weight:600;line-height:1.35}
+  .md h1{font-size:21px} .md h2{font-size:18px} .md h3{font-size:16px}
+  .md p{margin:10px 0} .md ul,.md ol{margin:10px 0;padding-left:22px} .md li{margin:5px 0}
+  .md strong{font-weight:600;color:var(--text)} .md em{font-style:italic}
+  .md a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-soft)} .md a:hover{border-bottom-color:var(--accent)}
+  .md blockquote{border-left:3px solid var(--accent);padding:2px 14px;margin:10px 0;color:var(--muted);background:var(--panel);border-radius:0 8px 8px 0}
+  .md code.inline{background:var(--panel-3);padding:2px 6px;border-radius:5px;font-family:var(--mono);font-size:13px;color:#93B4EE}
+  .md table{border-collapse:collapse;margin:12px 0;width:100%;font-size:13px}
+  .md th,.md td{border:1px solid var(--border);padding:7px 10px;text-align:left}
+  .md th{background:var(--panel-2);font-weight:600}
+  .codeblock{margin:12px 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--code)}
+  .codeblock .cbh{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:var(--panel-2);border-bottom:1px solid var(--border)}
+  .codeblock .lang{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .codeblock .copy{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;transition:.14s}
+  .codeblock .copy:hover{color:var(--text);border-color:var(--accent)}
+  .codeblock pre{margin:0;padding:13px 14px;overflow-x:auto} .codeblock code{font-family:var(--mono);font-size:12.5px;line-height:1.6;color:#E4E8F0}
+
+  /* tool badge */
+  .tools-used{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}
+  .tbadge{font-family:var(--mono);font-size:11px;background:var(--panel);border:1px solid var(--border);color:var(--accent);
+    padding:3px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:5px}
+
+  /* Cards (proposal / tool table) */
+  .card{margin:12px 0;border:1px solid var(--border);border-radius:12px;background:var(--panel);overflow:hidden}
+  .card .ch{display:flex;align-items:center;gap:8px;padding:11px 14px;background:var(--panel-2);border-bottom:1px solid var(--border);font-size:13.5px;font-weight:600}
+  .card.approve{border-color:rgba(59,130,246,.4)} .card.approve .ch{background:var(--accent-soft)}
+  .card.skillc{border-color:rgba(251,191,36,.45)} .card.skillc .ch{background:var(--amber-soft)}
+  .card pre.preview{margin:0;max-height:230px;overflow:auto;padding:12px 14px;font-family:var(--mono);font-size:12px;line-height:1.55;color:#C9D0DD;background:var(--code)}
+  .card .cbody{padding:12px 14px;font-size:13px;line-height:1.6;color:var(--muted)}
+  .card .ca{display:flex;gap:8px;padding:11px 14px;border-top:1px solid var(--border);flex-wrap:wrap}
+  .b{border:none;border-radius:8px;padding:8px 15px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.14s;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+  .b.primary{background:var(--accent);color:#fff} .b.primary:hover{background:var(--accent-600)}
+  .b.ok{background:var(--green);color:#06231a} .b.ok:hover{filter:brightness(1.08)}
+  .b.ghost{background:var(--panel-3);color:var(--muted)} .b.ghost:hover{color:var(--text)}
+  .b.danger{background:var(--red-soft);color:var(--red);border:1px solid rgba(248,113,113,.4)}
+  .b:disabled{opacity:.45;cursor:not-allowed}
+  .badge{font-size:10.5px;font-family:var(--mono);padding:2px 8px;border-radius:20px}
+  .badge.new{background:var(--green-soft);color:var(--green)} .badge.over{background:var(--amber-soft);color:var(--amber)}
+  .cstatus{padding:0 14px 12px;font-size:12px;color:var(--green);display:none} .card.done .cstatus{display:block} .card.done .ca{display:none}
+
+  /* Audio/tool result table */
+  .rtable{width:100%;border-collapse:collapse;font-size:12.5px}
+  .rtable th{background:var(--panel-2);color:var(--muted);font-weight:600;text-align:left;padding:8px 12px;position:sticky;top:0}
+  .rtable td{padding:8px 12px;border-top:1px solid var(--border-soft);vertical-align:middle}
+  .rtable tr:hover td{background:var(--panel-2)}
+  .rtable .fn{font-family:var(--mono);font-size:11.5px;color:#C9D0DD;word-break:break-all}
+  .st{font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:6px;white-space:nowrap}
+  .st.err{background:var(--red-soft);color:var(--red)} .st.warn{background:var(--amber-soft);color:var(--amber)}
+  .st.ok{background:var(--green-soft);color:var(--green)}
+  .scan-wrap{max-height:280px;overflow:auto}
+  .scan-sum{display:flex;gap:16px;flex-wrap:wrap;padding:12px 14px;font-size:12px;color:var(--muted)}
+  .scan-sum b{color:var(--text)}
+  .progress{height:6px;background:var(--panel-3);border-radius:6px;overflow:hidden;margin:0 14px 12px}
+  .progress i{display:block;height:100%;background:var(--accent);transition:width .2s;border-radius:6px}
+
+  /* Composer */
+  .composer{padding:10px 22px 12px;flex-shrink:0}
+  .composer-inner{max-width:800px;margin:0 auto}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .chip{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:11.5px;color:var(--muted)}
+  .chip .x{cursor:pointer;color:var(--muted-2)} .chip .x:hover{color:var(--red)}
+  .inputbox{position:relative;background:var(--panel);border:1px solid var(--border);border-radius:16px;transition:.15s;box-shadow:var(--shadow)}
+  .inputbox:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .inputbox textarea{width:100%;background:transparent;border:none;color:var(--text);font-family:inherit;font-size:14.5px;
+    line-height:1.6;resize:none;padding:14px 52px 14px 46px;max-height:200px;min-height:52px;outline:none}
+  .inputbox textarea::placeholder{color:var(--muted-2)}
+  .clip{position:absolute;left:11px;bottom:11px;width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:var(--muted);
+    cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:.14s}
+  .clip:hover{background:var(--panel-3);color:var(--text)}
+  .send{position:absolute;right:10px;bottom:10px;width:32px;height:32px;border-radius:9px;border:none;background:var(--accent);color:#fff;
+    cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:.14s}
+  .send:hover{background:var(--accent-600)} .send:disabled{opacity:.4;cursor:not-allowed}
+  .send.stop{background:var(--red)}
+
+  .typing{display:flex;gap:4px;padding:8px 2px}
+  .typing span{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:tb 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.2s} .typing span:nth-child(3){animation-delay:.4s}
+  @keyframes tb{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
+
+  /* Statusline */
+  .statusline{height:28px;background:#0A0D14;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;
+    padding:0 12px;font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0;white-space:nowrap;overflow:hidden}
+  .statusline .mode{color:var(--green);font-weight:500} .statusline .mode.off{color:var(--muted-2)}
+  .statusline .mdl{color:var(--accent)}
+  .statusline .act{flex:1;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+  .statusline .ctx{color:var(--muted)} .statusline .ctx b{color:var(--text)}
+  .sldiv{color:var(--border);}
+
+  /* Artifacts panel */
+  .artifacts{background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;min-width:0}
+  .art-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+  .art-head b{font-size:13.5px;flex:1}
+  .art-tabs{display:flex;gap:4px;padding:8px 12px 0;flex-shrink:0}
+  .art-tab{padding:6px 12px;border:1px solid var(--border);border-bottom:none;background:var(--bg);color:var(--muted);font-size:12px;
+    border-radius:8px 8px 0 0;cursor:pointer}
+  .art-tab.active{background:var(--panel-2);color:var(--text)}
+  .art-body{flex:1;overflow:auto;padding:14px;font-size:13px;line-height:1.6}
+  .art-body pre{font-family:var(--mono);font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:#C9D0DD}
+  .art-empty{color:var(--muted-2);text-align:center;padding:40px 20px;font-size:13px}
+
+  /* Modal (agent/skill editors kept minimal) */
+  .modal{position:fixed;inset:0;background:rgba(6,9,15,.74);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .modal.show{display:flex} .modal-inner{background:var(--panel);border:1px solid var(--border);border-radius:14px;max-width:560px;width:100%;max-height:86vh;overflow:auto;box-shadow:var(--shadow)}
+  .modal h3{padding:16px 18px;border-bottom:1px solid var(--border);font-size:15px}
+  .modal .mb{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+  .modal label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}
+  .modal input,.modal textarea,.modal select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-family:inherit;font-size:13px}
+  .modal textarea{min-height:90px;resize:vertical;font-family:var(--mono);line-height:1.5}
+  .modal .mf{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--border)}
+  .toast{position:fixed;bottom:44px;left:50%;transform:translateX(-50%);background:var(--panel-3);border:1px solid var(--border);
+    color:var(--text);padding:10px 18px;border-radius:10px;font-size:13px;box-shadow:var(--shadow);z-index:80;opacity:0;transition:.2s;pointer-events:none}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <!-- ===== LEFT SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 2l1.7 6.6L20 10l-6.3 1.4L12 18l-1.7-6.6L4 10l6.3-1.4z"/></svg></div>
+      <div><b>LM Co-work</b><small>Local AI workspace</small></div>
+    </div>
+    <button class="newchat" onclick="newChat()"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
+    <div class="tabs">
+      <button class="tab active" data-tab="chats" onclick="switchTab('chats')"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chats</button>
+      <button class="tab" data-tab="files" onclick="switchTab('files')"><svg class="ico" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg>Files</button>
+      <button class="tab" data-tab="skills" onclick="switchTab('skills')"><svg class="ico" viewBox="0 0 24 24"><path d="M15 6a3 3 0 1 0-6 0v2H7a3 3 0 1 0 0 6h2v2a3 3 0 1 0 6 0v-2h2a3 3 0 1 0 0-6h-2z"/></svg>Skills</button>
+    </div>
+
+    <div class="pane" id="pane-chats"></div>
+
+    <div class="pane" id="pane-files" hidden>
+      <div class="ws-head">
+        <div class="ws-path" id="wsPath" title="">—</div>
+        <button class="icon-btn" title="เลือกโฟลเดอร์งาน" onclick="pickWorkspace()" style="width:30px;height:30px"><svg class="ico" viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg></button>
+      </div>
+      <div class="tree" id="tree"></div>
+    </div>
+
+    <div class="pane" id="pane-skills" hidden></div>
+
+    <div class="side-foot">
+      <button class="fbtn" onclick="scanFiles()"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>ตรวจไฟล์เสีย</button>
+      <button class="fbtn" onclick="reloadSkills()"><svg class="ico" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>Skills</button>
+    </div>
+  </aside>
+
+  <!-- ===== CENTER ===== -->
+  <main class="main">
+    <div class="topbar">
+      <button class="icon-btn" id="btnLeft" title="ซ่อน/แสดงแถบซ้าย" onclick="toggleLeft()"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
+      <select class="sel" id="agentSel" onchange="onAgentChange()"></select>
+      <select class="sel" id="modelSel" onchange="onModelChange()"></select>
+      <div class="toggle" id="coworkToggle" onclick="toggleCowork()">
+        <span>Co-Work</span><span class="sw"></span>
+      </div>
+      <div class="spacer"></div>
+      <button class="icon-btn" title="Artifacts / Log" onclick="toggleRight()" id="btnRight"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+    </div>
+
+    <div class="feed" id="feed">
+      <div class="feed-inner" id="feedInner"></div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-inner">
+        <div class="chips" id="chips"></div>
+        <div class="inputbox">
+          <button class="clip" title="แนบไฟล์" onclick="attachFile()"><svg class="ico" viewBox="0 0 24 24"><path d="M21.4 11 12.3 20.1a6 6 0 0 1-8.5-8.5l9.2-9.1a4 4 0 0 1 5.7 5.6l-9.2 9.2a2 2 0 0 1-2.8-2.9l8.5-8.4"/></svg></button>
+          <textarea id="input" placeholder="พิมพ์ข้อความ...  (Enter = ส่ง · Shift+Enter = ขึ้นบรรทัด)" rows="1"></textarea>
+          <button class="send" id="send" title="ส่ง" onclick="onSend()"><svg class="ico" viewBox="0 0 24 24" style="stroke:#fff"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="statusline">
+      <span class="mode" id="slMode">[💬 Chat]</span>
+      <span class="sldiv">│</span>
+      <span class="mdl" id="slModel">—</span>
+      <span class="sldiv">│</span>
+      <span class="act" id="slAct">พร้อมใช้งาน</span>
+      <span class="ctx" id="slCtx">CTX [░░░░░░░░] 0/0</span>
+    </div>
+  </main>
+
+  <!-- ===== RIGHT ARTIFACTS ===== -->
+  <aside class="artifacts">
+    <div class="art-head"><b>Artifacts</b>
+      <button class="icon-btn" style="width:28px;height:28px" onclick="toggleRight()"><svg class="ico" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="art-tabs">
+      <button class="art-tab active" data-atab="view" onclick="artTab('view')">Preview</button>
+      <button class="art-tab" data-atab="raw" onclick="artTab('raw')">Raw</button>
+      <button class="art-tab" data-atab="log" onclick="artTab('log')">Log</button>
+    </div>
+    <div class="art-body" id="artBody"><div class="art-empty">ยังไม่มี artifact — เปิดไฟล์จากแถบ Files หรือรันเครื่องมือเพื่อดูผลที่นี่</div></div>
+  </aside>
+</div>
+
+<input type="file" id="fileInput" style="display:none">
+<div class="modal" id="modal"><div class="modal-inner" id="modalInner"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================= *
+ *  LM Co-work — Vanilla JS front-end (pywebview / WebView2)
+ *  Talks to server.py HTTP API. State persisted via /api/set-data.
+ * ============================================================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+/* inline SVG line-icons (แทน emoji) */
+const IC={
+  spark:'<svg class="ico" viewBox="0 0 24 24"><path d="M12 2l1.7 6.6L20 10l-6.3 1.4L12 18l-1.7-6.6L4 10l6.3-1.4z"/></svg>',
+  user:'<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>',
+  send:'<svg class="ico" viewBox="0 0 24 24" style="stroke:#fff"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  stop:'<svg class="ico" viewBox="0 0 24 24" style="stroke:#fff"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
+  gear:'<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7 7 0 0 0-1.7-1L14.5 2h-5l-.3 2.9a7 7 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.3 2.9h5l.3-2.9a7 7 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6a7 7 0 0 0 .1-1z"/></svg>',
+  file:'<svg class="ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+  image:'<svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>',
+  audio:'<svg class="ico" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+  video:'<svg class="ico" viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/></svg>',
+  code:'<svg class="ico" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg>',
+  archive:'<svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>',
+  wrench:'<svg class="ico" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5 5L3 18l3 3 6.7-6.7a4 4 0 0 0 5-5l-2.8 2.8-2.2-2.2z"/></svg>',
+  book:'<svg class="ico" viewBox="0 0 24 24"><path d="M4 4h13a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2z"/><path d="M4 18h15"/></svg>',
+  toolkit:'<svg class="ico" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  alert:'<svg class="ico" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>',
+};
+
+const state = {
+  agents:[], skills:[], models:[], workspace:"", defaultAgent:"general",
+  agentKey:"general", model:"", cowork:false,
+  chats:[], curId:null, busy:false,
+  ctxMax:8192, artifact:{view:"",raw:"",log:""}, artTab:"view"
+};
+
+/* ---------- API helper ---------- */
+async function api(path, body){
+  const opt = {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body||{})};
+  const r = await fetch(path, body===undefined?{}:opt);
+  return r.json();
+}
+async function apiGet(path){ const r = await fetch(path); return r.json(); }
+
+/* ---------- persistence (server data_store) ---------- */
+async function loadData(key){ try{ const r=await api("/api/get-data",{key}); return r.data; }catch(e){ return null; } }
+const _saveTimers={};
+function saveData(key,data){ clearTimeout(_saveTimers[key]); _saveTimers[key]=setTimeout(()=>{ api("/api/set-data",{key,data}).catch(()=>{}); },250); }
+
+/* ---------- toast ---------- */
+let _toastT;
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove("show"),2200); }
+
+/* ============================================================= *
+ *  Markdown
+ * ============================================================= */
+function md(src){
+  src = String(src==null?"":src);
+  const blocks=[]; // code fences
+  const PH="\u2063CB"; // QUAL-4: placeholder ระหว่างประมวลผล — เดิมใช้ null byte (\x00) จริง
+                         // ซึ่งเปราะ (เครื่องมือบางตัวตีความไฟล์เป็น binary) เปลี่ยนมาใช้
+                         // อักขระ invisible separator ของ Unicode แทน
+  src = src.replace(/```(\w*)\n?([\s\S]*?)```/g,(m,lang,code)=>{
+    const i=blocks.length; blocks.push({lang:lang||"text",code:code.replace(/\n$/,"")}); return PH+i+PH;
+  });
+  // escape
+  src = esc(src);
+  // headings
+  src = src.replace(/^### (.*)$/gm,"<h3>$1</h3>").replace(/^## (.*)$/gm,"<h2>$1</h2>").replace(/^# (.*)$/gm,"<h1>$1</h1>");
+  // blockquote
+  src = src.replace(/^&gt; (.*)$/gm,"<blockquote>$1</blockquote>");
+  // bold / italic / inline code
+  src = src.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
+  src = src.replace(/(^|[^*])\*([^*\n]+)\*/g,"$1<em>$2</em>");
+  src = src.replace(/`([^`]+)`/g,'<code class="inline">$1</code>');
+  // links [t](u) — only http/https
+  src = src.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,(m,t,u)=>`<a href="${u}" target="_blank" rel="noopener">${t}</a>`);
+  // lists
+  src = src.replace(/(?:^|\n)((?:[ \t]*[-*] .*(?:\n|$))+)/g,(m,list)=>{
+    const items=list.trim().split(/\n/).map(l=>l.replace(/^[ \t]*[-*] /,"")).map(t=>`<li>${t}</li>`).join(""); return "\n<ul>"+items+"</ul>";
+  });
+  src = src.replace(/(?:^|\n)((?:[ \t]*\d+\. .*(?:\n|$))+)/g,(m,list)=>{
+    const items=list.trim().split(/\n/).map(l=>l.replace(/^[ \t]*\d+\. /,"")).map(t=>`<li>${t}</li>`).join(""); return "\n<ol>"+items+"</ol>";
+  });
+  // paragraphs
+  src = src.split(/\n{2,}/).map(p=>{
+    const t=p.trim(); if(!t) return "";
+    if(/^<(h\d|ul|ol|blockquote|pre|table|div)/.test(t)) return t;
+    if(t.indexOf(PH)===0) return t;
+    return "<p>"+t.replace(/\n/g,"<br>")+"</p>";
+  }).join("\n");
+  // restore code blocks
+  src = src.replace(new RegExp(PH+"(\\d+)"+PH,"g"),(m,i)=>{
+    const b=blocks[+i]; const id="cb"+Math.random().toString(36).slice(2,8);
+    return `<div class="codeblock"><div class="cbh"><span class="lang">${esc(b.lang)}</span>`+
+      `<button class="copy" onclick="copyCode('${id}')">คัดลอก</button></div>`+
+      `<pre><code id="${id}">${esc(b.code)}</code></pre></div>`;
+  });
+  return src;
+}
+async function copyCode(id){
+  const el=$(id); if(!el) return; const text=el.textContent;
+  try{ await navigator.clipboard.writeText(text); }
+  catch(e){ if(window.pywebview&&window.pywebview.api&&window.pywebview.api.copy_text){ await window.pywebview.api.copy_text(text); } }
+  toast("คัดลอกโค้ดแล้ว");
+}
+
+/* ============================================================= *
+ *  Chat rendering
+ * ============================================================= */
+function cur(){ return state.chats.find(c=>c.id===state.curId); }
+function scrollDown(){ const f=$("feed"); f.scrollTop=f.scrollHeight; }
+
+function clearFeed(){ $("feedInner").innerHTML=""; }
+function showWelcome(){
+  clearFeed();
+  const a=state.agents.find(x=>x.key===state.agentKey);
+  $("feedInner").innerHTML=`<div class="welcome"><div class="wlogo"><svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M12 2l1.7 6.6L20 10l-6.3 1.4L12 18l-1.7-6.6L4 10l6.3-1.4z"/></svg></div>
+    <h2>สวัสดี! ${a?esc(a.title):""}</h2>
+    <p>ผู้ช่วย AI ที่รันบนเครื่องคุณผ่าน LM Studio — คุยได้ทั่วไป เขียนโค้ด จัดการไฟล์ในโฟลเดอร์งาน และตรวจไฟล์เสีย</p>
+    <div class="suggest">
+      <button onclick="quick('ช่วยสรุปงานที่ทำได้บ้าง')">ทำอะไรได้บ้าง?</button>
+      <button onclick="quick('ตรวจไฟล์เพลงเสียในโฟลเดอร์งานให้หน่อย')">ตรวจไฟล์เสีย</button>
+      <button onclick="quick('เขียนสคริปต์ Python อ่านไฟล์ CSV')">เขียนโค้ด</button>
+    </div></div>`;
+}
+function quick(t){ $("input").value=t; onSend(); }
+
+function bubble(role, html){
+  const el=document.createElement("div"); el.className="msg "+role;
+  const av = role==="ai" ? IC.spark : IC.user;
+  if(role==="user"){ el.innerHTML=`<div class="av">${av}</div><div class="wrap"><div class="body">${html}</div></div>`; }
+  else{ el.innerHTML=`<div class="av">${av}</div><div class="body"><div class="md">${html}</div></div>`; }
+  $("feedInner").appendChild(el); scrollDown();
+  return el;
+}
+
+function renderTools(el, tools){
+  if(!tools||!tools.length) return;
+  const uniq=[...new Set(tools)];
+  const d=document.createElement("div"); d.className="tools-used";
+  d.innerHTML=uniq.map(t=>`<span class="tbadge">${IC.gear}${esc(t)}</span>`).join("");
+  el.querySelector(".body").appendChild(d);
+}
+
+/* write_file approval + skill confirm cards */
+function renderProposal(el, p){
+  const host=el.querySelector(".body");
+  const div=document.createElement("div");
+  if(p.type==="skill_confirm"){
+    div.className="card skillc";
+    // SEC-4: proposal ประเภทนี้ตอนนี้ใช้ร่วมกับเครื่องมือระบบ (เช่น install_ffmpeg)
+    // ด้วย ไม่ใช่แค่ skill ที่ผู้ใช้สร้างเอง — ข้อความเลยเขียนแบบกลางๆ ไม่เจาะจงว่า "Skill"
+    div.innerHTML=`<div class="ch">⚠️ ยืนยันก่อนรันครั้งแรก</div>
+      <div class="cbody">AI ขอเรียก: <b style="color:var(--text)">${esc(p.name)}</b><br>
+        <span style="font-family:var(--mono);font-size:11.5px">args: ${esc(JSON.stringify(p.args||{}))}</span><br>
+        <span style="color:var(--red)">⚠️ การทำงานนี้จะรัน/เปลี่ยนแปลงบนเครื่องคุณ — ยืนยันเฉพาะที่คุณเชื่อถือ</span></div>
+      <div class="ca"><button class="b ok">✅ อนุมัติและรัน</button><button class="b ghost">❌ ปฏิเสธ</button></div>
+      <div class="cstatus"></div>`;
+    host.appendChild(div);
+    div.querySelector(".b.ok").onclick=async()=>{
+      const r=await api("/api/confirm-skill",{name:p.name,args:p.args||{}});
+      div.querySelector(".cstatus").textContent="✔ "+(r.ok?"อนุมัติแล้ว":"ผิดพลาด"); div.classList.add("done");
+      pushLog("skill "+p.name+" → "+JSON.stringify(r.result));
+      const c=cur(); if(c){ c.messages.push({role:"tool",tool_call_id:"cf_"+Date.now(),content:String(r.result)}); sendCore(); }
+    };
+    div.querySelector(".b.ghost").onclick=()=>{ div.querySelector(".cstatus").style.color="var(--muted)"; div.querySelector(".cstatus").textContent="ยกเลิก"; div.classList.add("done"); };
+    scrollDown(); return;
+  }
+  div.className="card approve";
+  const badge = p.exists?'<span class="badge over">เขียนทับ</span>':'<span class="badge new">ไฟล์ใหม่</span>';
+  div.innerHTML=`<div class="ch">📝 ${esc(p.path)} ${badge}</div>
+    <pre class="preview">${esc(p.content)}</pre>
+    <div class="ca"><button class="b ok">✅ Confirm &amp; Save</button><button class="b ghost">❌ Discard</button>
+      <button class="b ghost" style="margin-left:auto">↗ ดูใน Artifacts</button></div>
+    <div class="cstatus"></div>`;
+  host.appendChild(div);
+  div.querySelector(".b.ok").onclick=async()=>{
+    const r=await api("/api/apply",{path:p.path,content:p.content,workspace:state.workspace});
+    div.querySelector(".cstatus").textContent="✔ "+(r.message||"บันทึกแล้ว"); div.classList.add("done");
+    if(state.tabNow==="files") loadTree("");
+  };
+  div.querySelector(".b.ghost").onclick=()=>{ div.querySelector(".cstatus").style.color="var(--muted)"; div.querySelector(".cstatus").textContent="ยกเลิก — ไม่บันทึก"; div.classList.add("done"); };
+  div.querySelectorAll(".b.ghost")[1].onclick=()=>{ openArtifact(p.path, p.content); };
+  scrollDown();
+}
+
+/* ============================================================= *
+ *  Send message (non-stream: returns reply+tools+proposals)
+ * ============================================================= */
+function onSend(){ if(state.busy) return stopChat(); sendUser(); }
+
+function sendUser(){
+  const inp=$("input"); const text=inp.value.trim();
+  if((!text && !attached.length) || state.busy) return;
+  let c=cur(); if(!c){ c=newChat(true); }
+  const w=$("feedInner").querySelector(".welcome"); if(w) w.remove();
+
+  let shown=text;
+  if(attached.length) shown=(text?text+"\n\n":"")+"📎 "+attached.map(f=>f.name).join(", ");
+  bubble("user", esc(shown||"(แนบไฟล์)").replace(/\n/g,"<br>"));
+
+  let toSend=text;
+  if(attached.length) toSend=(text?text+"\n\n":"")+"[ผู้ใช้แนบไฟล์เข้าโฟลเดอร์งาน: "+attached.map(f=>f.name).join(", ")+" — ใช้ read_file อ่านได้]";
+  c.messages.push({role:"user",content:toSend||"(ไฟล์แนบ)"});
+  if(c.title==="แชตใหม่"){ c.title=(text||attached[0]&&attached[0].name||"แชต").slice(0,42); renderChats(); }
+  attached=[]; renderChips();
+  inp.value=""; inp.style.height="auto";
+  saveChats();
+  sendCore();
+}
+
+let chatAbort=null;
+async function sendCore(){
+  const c=cur(); if(!c) return;
+  state.busy=true; setSending(true); setStatus("กำลังคิด…");
+  const tdiv=document.createElement("div"); tdiv.className="msg ai"; tdiv.id="typingRow";
+  tdiv.innerHTML='<div class="av">'+IC.spark+'</div><div class="body"><div class="typing"><span></span><span></span><span></span></div></div>';
+  $("feedInner").appendChild(tdiv); scrollDown();
+  try{
+    chatAbort=new AbortController();
+    const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
+      signal:chatAbort.signal,
+      body:JSON.stringify({agent:state.agentKey,model:state.model,workspace:state.workspace,messages:c.messages,cowork:state.cowork})});
+    const data=await r.json();
+    const t=$("typingRow"); if(t) t.remove();
+    const reply=data.reply||"";
+    const el=bubble("ai", md(reply));
+    renderTools(el, data.tools);
+    (data.proposals||[]).forEach(p=>renderProposal(el,p));
+    if(!data.cancelled) c.messages.push({role:"assistant",content:reply});
+    if(data.tools&&data.tools.length) pushLog("tools: "+[...new Set(data.tools)].join(", "));
+    saveChats(); updateCtx();
+    setStatus(data.cancelled?"ยกเลิกแล้ว":"เสร็จ ✓");
+  }catch(e){
+    const t=$("typingRow"); if(t) t.remove();
+    if(e.name==="AbortError"){ bubble("ai","⛔ ยกเลิกแล้ว"); setStatus("ยกเลิก"); }
+    else{ bubble("ai","⚠️ เชื่อมต่อไม่ได้: "+esc(e.message)); setStatus("error"); }
+  }
+  state.busy=false; setSending(false); chatAbort=null; $("input").focus();
+}
+async function stopChat(){ try{ if(chatAbort) chatAbort.abort(); await fetch("/api/cancel",{method:"POST"}); }catch(e){} }
+
+function setSending(on){
+  const b=$("send");
+  if(on){ b.classList.add("stop"); b.innerHTML=IC.stop; b.title="หยุด"; }
+  else{ b.classList.remove("stop"); b.innerHTML=IC.send; b.title="ส่ง"; }
+}
+
+/* ============================================================= *
+ *  Chats list (persisted)
+ * ============================================================= */
+function uid(){ return "c"+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+function newChat(silent){
+  const c={id:uid(),title:"แชตใหม่",agent:state.agentKey,messages:[],ts:Date.now()};
+  state.chats.unshift(c); state.curId=c.id;
+  if(!silent){ renderChats(); showWelcome(); saveChats(); switchTab("chats"); }
+  return c;
+}
+function loadChat(id){
+  state.curId=id; const c=cur(); if(!c) return;
+  if(c.agent){ state.agentKey=c.agent; $("agentSel").value=c.agent; }
+  renderChats();
+  clearFeed();
+  if(!c.messages.length){ showWelcome(); }
+  else{
+    c.messages.forEach(m=>{
+      if(m.role==="user") bubble("user", esc(m.content).replace(/\n/g,"<br>"));
+      else if(m.role==="assistant") bubble("ai", md(m.content));
+    });
+  }
+  updateStatus(); updateCtx();
+}
+function delChat(id,ev){
+  ev.stopPropagation();
+  state.chats=state.chats.filter(c=>c.id!==id);
+  if(state.curId===id){ state.curId=state.chats[0]?state.chats[0].id:null; if(state.curId) loadChat(state.curId); else { newChat(); } }
+  renderChats(); saveChats();
+}
+function renderChats(){
+  const p=$("pane-chats");
+  if(!state.chats.length){ p.innerHTML='<div class="empty">ยังไม่มีแชต<br>กด ✚ New Chat เพื่อเริ่ม</div>'; return; }
+  // SEC-2: ใช้ data-attribute + addEventListener แทน onclick="fn('...')" แบบ inline —
+  // การ escape ด้วย esc() (HTML-entity) เอาไม่อยู่ถ้าค่าไปอยู่ใน inline event handler
+  // เพราะ browser decode entity ก่อนแปลเป็น JS ทำให้หลุด string literal ได้
+  p.innerHTML=state.chats.map(c=>`<div class="recent ${c.id===state.curId?"active":""}" data-chat-id="${esc(c.id)}">
+    <span>💬</span><span class="ti">${esc(c.title)}</span><span class="del" data-del-id="${esc(c.id)}">🗑</span></div>`).join("");
+  p.querySelectorAll(".recent").forEach(row=>{
+    row.addEventListener("click", ()=>loadChat(row.dataset.chatId));
+  });
+  p.querySelectorAll(".del").forEach(btn=>{
+    btn.addEventListener("click", ev=>delChat(btn.dataset.delId, ev));
+  });
+}
+function saveChats(){
+  const slim=state.chats.slice(0,60).map(c=>({id:c.id,title:c.title,agent:c.agent,ts:c.ts,messages:c.messages.slice(-40)}));
+  saveData("chats",slim);
+}
+
+/* ============================================================= *
+ *  Files tree
+ * ============================================================= */
+async function loadTree(sub){
+  const r=await api("/api/files",{path:sub||"",workspace:state.workspace});
+  state.workspace=r.workspace||state.workspace; state.treePath=r.path||"";
+  $("wsPath").textContent=state.workspace||"—"; $("wsPath").title=state.workspace||"";
+  const t=$("tree"); let html="";
+  // SEC-2: data-attribute + addEventListener แทน onclick="fn('...')" — ชื่อไฟล์/โฟลเดอร์
+  // มาจากไฟล์ระบบจริง ถ้ามีเครื่องหมาย ' ปน จะหลุดออกจาก string literal ใน onclick ได้
+  if(r.path){ const up=r.path.split(/[\\/]/).slice(0,-1).join("/"); html+=`<div class="row up" data-tree-path="${esc(up)}"><span class="ic">↑</span><span class="nm">.. ย้อนกลับ</span></div>`; }
+  (r.files||[]).forEach(f=>{
+    const child=(r.path?r.path+"/":"")+f.name;
+    if(f.dir) html+=`<div class="row" data-tree-path="${esc(child)}"><span class="ic">📁</span><span class="nm">${esc(f.name)}</span></div>`;
+    else html+=`<div class="row" data-open-path="${esc(child)}"><span class="ic">${fileIcon(f.name)}</span><span class="nm">${esc(f.name)}</span><span class="sz">${fmtSize(f.size)}</span></div>`;
+  });
+  if(!(r.files||[]).length && !r.path) html+='<div class="empty">โฟลเดอร์ว่าง</div>';
+  t.innerHTML=html;
+  t.querySelectorAll("[data-tree-path]").forEach(row=>{
+    row.addEventListener("click", ()=>loadTree(row.dataset.treePath));
+  });
+  t.querySelectorAll("[data-open-path]").forEach(row=>{
+    row.addEventListener("click", ()=>openFile(row.dataset.openPath));
+  });
+}
+function fileIcon(n){ const e=n.split(".").pop().toLowerCase();
+  if(["png","jpg","jpeg","gif","webp","bmp","ico"].includes(e))return IC.image;
+  if(["mp3","wav","flac","m4a","ogg","opus","aac"].includes(e))return IC.audio;
+  if(["mp4","mkv","avi","mov","webm"].includes(e))return IC.video;
+  if(["py","js","ts","html","css","json","md","c","cpp","java"].includes(e))return IC.code;
+  if(["zip","rar","7z","tar","gz"].includes(e))return IC.archive;
+  if(e==="pdf")return IC.book; return IC.file; }
+function fmtSize(b){ if(b<1024)return b+"B"; if(b<1048576)return (b/1024).toFixed(0)+"K"; return (b/1048576).toFixed(1)+"M"; }
+async function openFile(path){
+  const r=await api("/api/readfile",{path,workspace:state.workspace});
+  openArtifact(path, r.content||"(ว่าง)");
+}
+async function pickWorkspace(){
+  if(!(window.pywebview&&window.pywebview.api&&window.pywebview.api.pick_folder)){ toast("ใช้เลือกโฟลเดอร์ได้เฉพาะในแอป (.exe)"); return; }
+  const path=await window.pywebview.api.pick_folder(); if(!path) return;
+  const r=await api("/api/setdir",{path,cowork:state.cowork});
+  state.workspace=r.workspace||path; saveData("settings",settingsObj());
+  loadTree(""); toast("ตั้งโฟลเดอร์งาน: "+state.workspace);
+}
+
+/* ============================================================= *
+ *  Skills
+ * ============================================================= */
+function renderSkills(){
+  const p=$("pane-skills");
+  if(!state.skills.length){ p.innerHTML='<div class="empty">ยังไม่มี skill<br>วางโฟลเดอร์ใน skills/ แล้วกด ⟳</div>'; return; }
+  const ic={code:IC.wrench,prompt:IC.book,both:IC.toolkit,error:IC.alert};
+  p.innerHTML=state.skills.map(s=>`<div class="skill ${s.error?"err":""}">
+    <span class="si">${ic[s.type]||IC.toolkit}</span>
+    <div><div class="sn">${esc(s.name)} <span class="stype">${esc(s.type)}</span></div>
+    <div class="sd">${esc(s.error||s.description||"")}</div></div></div>`).join("");
+}
+async function reloadSkills(){
+  const r=await api("/api/reload-skills",{});
+  state.skills=r.skills||[]; renderSkills(); toast("โหลด skills ใหม่: "+(r.count||0)+" รายการ");
+}
+
+/* ============================================================= *
+ *  Audio / file-integrity scan → tool card
+ * ============================================================= */
+let scanPoll=null;
+async function scanFiles(){
+  const folder=state.workspace||"";
+  const r=await api("/api/audio-scan",{folder,recursive:true,ext:""});
+  if(!r.ok){ toast(r.error||"เริ่มสแกนไม่ได้"); return; }
+  switchTab("chats");
+  const c=cur()||newChat(true); const w=$("feedInner").querySelector(".welcome"); if(w) w.remove();
+  const el=bubble("ai", md("🔍 กำลังสแกนไฟล์ในโฟลเดอร์งานเพื่อหาไฟล์เสีย/ว่าง/ซ้ำ…"));
+  const host=el.querySelector(".body");
+  const card=document.createElement("div"); card.className="card"; host.appendChild(card); scrollDown();
+  clearInterval(scanPoll);
+  scanPoll=setInterval(async()=>{
+    let s; try{ s=await apiGet("/api/audio-scan-status"); }catch(e){ return; }
+    const pct = s.total? Math.round(s.done/s.total*100):0;
+    setStatus(`⚙️ สแกน ${s.done}/${s.total} (${pct}%)`);
+    card.innerHTML=renderScanCard(s);
+    bindScanCard(card,s);
+    if(s.finished){ clearInterval(scanPoll); setStatus(`สแกนเสร็จ — พบเสีย ${s.corrupt?s.corrupt.length:0} ไฟล์`); pushLog("scan done: "+JSON.stringify(s.summary)); }
+  },500);
+}
+function renderScanCard(s){
+  if(s.error) return `<div class="ch">🔍 ผลการสแกน</div><div class="cbody" style="color:var(--red)">${esc(s.error)}</div>`;
+  const corrupt=s.corrupt||[], empty=s.empty||[], dups=s.duplicates||[];
+  let rows="";
+  corrupt.slice(0,200).forEach(x=>{ rows+=`<tr><td class="fn">${esc(x.file)}</td><td>${esc((x.file.split(".").pop()||"").toUpperCase())}</td><td><span class="st err">❌ ${esc(shortReason(x.reason))}</span></td></tr>`; });
+  empty.slice(0,50).forEach(f=>{ rows+=`<tr><td class="fn">${esc(f)}</td><td>—</td><td><span class="st warn">⚠️ ว่าง 0B</span></td></tr>`; });
+  const head=`<div class="ch">🔍 ตรวจไฟล์เสีย ${s.finished?"✓":"…"}</div>`;
+  const prog = s.finished?"":`<div class="progress"><i style="width:${s.total?Math.round(s.done/s.total*100):0}%"></i></div>`;
+  const sum=`<div class="scan-sum"><span>ทั้งหมด <b>${s.total||(s.summary&&s.summary.count)||0}</b></span>
+    <span>เสีย <b style="color:var(--red)">${corrupt.length}</b></span>
+    <span>ว่าง <b style="color:var(--amber)">${empty.length}</b></span>
+    <span>ซ้ำ <b>${dups.length}</b> กลุ่ม</span></div>`;
+  const table = rows? `<div class="scan-wrap"><table class="rtable"><thead><tr><th>File Name</th><th>Format</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : (s.finished?`<div class="cbody" style="color:var(--green)">✅ ไม่พบไฟล์เสีย/ว่าง</div>`:"");
+  const actions=`<div class="ca">
+    <button class="b primary" data-act="again">🔄 Scan Again</button>
+    <button class="b ghost" data-act="copy">📋 คัดลอกรายชื่อ</button>
+    <button class="b danger" data-act="del" disabled title="ลบเองใน File Explorer เพื่อความปลอดภัย">🗑 Delete Selected</button>
+  </div>`;
+  return head+prog+sum+table+(s.finished?actions:"");
+}
+function shortReason(r){ return String(r||"").slice(0,42); }
+function bindScanCard(card,s){
+  const again=card.querySelector('[data-act="again"]'); if(again) again.onclick=()=>scanFiles();
+  const cp=card.querySelector('[data-act="copy"]'); if(cp) cp.onclick=async()=>{
+    const list=(s.corrupt||[]).map(x=>x.file).concat(s.empty||[]).join("\n");
+    try{ await navigator.clipboard.writeText(list); }catch(e){ if(window.pywebview&&window.pywebview.api) await window.pywebview.api.copy_text(list); }
+    toast("คัดลอกรายชื่อไฟล์แล้ว");
+  };
+}
+
+/* ============================================================= *
+ *  Attachments
+ * ============================================================= */
+let attached=[];
+function attachFile(){ $("fileInput").click(); }
+$("fileInput").addEventListener("change",e=>{
+  const files=[...e.target.files]; e.target.value="";
+  files.forEach(f=>{
+    const rd=new FileReader();
+    rd.onload=async ev=>{
+      await api("/api/upload",{name:f.name,content:ev.target.result,workspace:state.workspace});
+      attached.push({name:f.name}); renderChips();
+    };
+    rd.readAsText(f);
+  });
+});
+function renderChips(){
+  $("chips").innerHTML=attached.map((f,i)=>`<span class="chip">📎 ${esc(f.name)} <span class="x" onclick="rmChip(${i})">✕</span></span>`).join("");
+}
+function rmChip(i){ attached.splice(i,1); renderChips(); }
+
+/* ============================================================= *
+ *  Artifacts panel
+ * ============================================================= */
+function toggleRight(){ $("app").classList.toggle("show-right"); $("btnRight").classList.toggle("on", $("app").classList.contains("show-right")); }
+function toggleLeft(){ $("app").classList.toggle("no-left"); }
+function artTab(t){ state.artTab=t; document.querySelectorAll(".art-tab").forEach(b=>b.classList.toggle("active",b.dataset.atab===t)); paintArt(); }
+function openArtifact(title, content){
+  state.artifact.view = `<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px">${esc(title)}</div><pre>${esc(content)}</pre>`;
+  state.artifact.raw = `<pre>${esc(content)}</pre>`;
+  if(!$("app").classList.contains("show-right")) toggleRight();
+  artTab("view");
+}
+function pushLog(line){
+  const ts=new Date().toLocaleTimeString();
+  state.artifact.log += `[${ts}] ${esc(line)}\n`;
+  if(state.artTab==="log") paintArt();
+}
+function paintArt(){
+  const b=$("artBody");
+  if(state.artTab==="log"){ b.innerHTML = state.artifact.log? `<pre>${state.artifact.log}</pre>` : '<div class="art-empty">ยังไม่มี log</div>'; return; }
+  const c=state.artifact[state.artTab];
+  b.innerHTML = c || '<div class="art-empty">ยังไม่มี artifact — เปิดไฟล์จากแถบ Files หรือรันเครื่องมือ</div>';
+}
+
+/* ============================================================= *
+ *  Topbar / state
+ * ============================================================= */
+function renderAgentSel(){
+  $("agentSel").innerHTML=state.agents.map(a=>`<option value="${a.key}" ${a.key===state.agentKey?"selected":""}>${esc(a.title)}</option>`).join("");
+}
+function renderModelSel(){
+  const opts=state.models.map(m=>`<option value="${esc(m)}" ${m===state.model?"selected":""}>${esc(m)}</option>`).join("");
+  $("modelSel").innerHTML=opts||`<option value="">${esc(state.model||"local-model")}</option>`;
+}
+function onAgentChange(){ state.agentKey=$("agentSel").value; const c=cur(); if(c) c.agent=state.agentKey; updateStatus(); if(c&&!c.messages.length) showWelcome(); saveChats(); }
+function onModelChange(){ state.model=$("modelSel").value; saveData("settings",settingsObj()); fetchCtx(); updateStatus(); }
+function toggleCowork(){ state.cowork=!state.cowork; $("coworkToggle").classList.toggle("on",state.cowork); api("/api/setdir",{path:state.workspace,cowork:state.cowork}).catch(()=>{}); saveData("settings",settingsObj()); updateStatus(); }
+function switchTab(t){
+  state.tabNow=t;
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
+  ["chats","files","skills"].forEach(x=>$("pane-"+x).hidden=(x!==t));
+  if(t==="files") loadTree(state.treePath||"");
+  if(t==="skills") renderSkills();
+}
+function settingsObj(){ return {agent:state.agentKey,model:state.model,cowork:state.cowork,workspace:state.workspace}; }
+
+/* statusline */
+function updateStatus(){
+  $("slMode").textContent = state.cowork? "co-work" : "chat";
+  $("slMode").className = "mode"+(state.cowork?"":" off");
+  $("slModel").textContent = state.model || "local-model";
+  updateCtx();
+}
+function setStatus(t){ $("slAct").textContent=t; }
+function updateCtx(){
+  const c=cur(); let chars=0; if(c) c.messages.forEach(m=>chars+=(m.content||"").length);
+  const used=Math.round(chars/3.5); // rough token estimate
+  const max=state.ctxMax||8192;
+  const ratio=Math.min(used/max,1); const filled=Math.round(ratio*8);
+  const bar="▓".repeat(filled)+"░".repeat(8-filled);
+  $("slCtx").innerHTML=`CTX [${bar}] <b>${(used/1000).toFixed(1)}k</b>/${(max/1000).toFixed(0)}k`;
+}
+async function fetchCtx(){
+  try{ const r=await api("/api/model-info",{model:state.model}); if(r.info&&r.info.context){ state.ctxMax=r.info.context; updateCtx(); } }catch(e){}
+}
+
+/* ============================================================= *
+ *  Input handlers
+ * ============================================================= */
+const inp=$("input");
+inp.addEventListener("input",()=>{ inp.style.height="auto"; inp.style.height=Math.min(inp.scrollHeight,200)+"px"; });
+inp.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); onSend(); } });
+
+/* ============================================================= *
+ *  Init
+ * ============================================================= */
+async function init(){
+  try{
+    const d=await apiGet("/api/agents");
+    state.agents=d.agents||[]; state.skills=d.skills||[]; state.workspace=d.workspace||"";
+    state.defaultAgent=d.default||"general"; state.agentKey=state.defaultAgent;
+    state.model=d.model||"";
+  }catch(e){ console.error(e); }
+  try{ const r=await apiGet("/api/models"); state.models=r.models||[]; if(!state.model&&state.models[0]) state.model=state.models[0]; }catch(e){}
+
+  // restore settings
+  const st=await loadData("settings");
+  if(st){ if(st.agent&&state.agents.find(a=>a.key===st.agent)) state.agentKey=st.agent;
+    if(st.model) state.model=st.model; if(typeof st.cowork==="boolean") state.cowork=st.cowork; }
+  // restore chats
+  const ch=await loadData("chats");
+  state.chats=Array.isArray(ch)?ch.map(c=>({messages:[],...c})):[];
+
+  renderAgentSel(); renderModelSel(); renderChats(); renderSkills();
+  $("coworkToggle").classList.toggle("on",state.cowork);
+  if(state.chats.length){ state.curId=state.chats[0].id; loadChat(state.curId); }
+  else { newChat(); }
+  updateStatus(); fetchCtx();
+  if(state.workspace){ $("wsPath").textContent=state.workspace; $("wsPath").title=state.workspace;
+    api("/api/setdir",{path:state.workspace,cowork:state.cowork}).catch(()=>{}); }
+  setStatus("พร้อมใช้งาน");
+}
+window.addEventListener("DOMContentLoaded",()=>{ init().catch(e=>{ console.error(e); document.getElementById("feedInner").innerHTML='<div class="welcome"><h2>โหลดไม่สำเร็จ</h2><p>'+esc(e.message)+'</p></div>'; }); });
+</script>
+</body>
+</html>

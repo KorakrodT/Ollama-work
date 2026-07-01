@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.ruff_cache/
+
+# Backups (จาก write_file และการแก้ไข)
+*.bak
+*.bak-*
+
+# PyInstaller output
+/build/
+/dist/
+/installer_output/
+
+# ข้อมูลผู้ใช้/รันไทม์ — มีประวัติแชทจริง, path ส่วนตัว, API key ของ provider ที่ตั้งค่าไว้
+# ห้าม commit ขึ้น GitHub เด็ดขาด (โดยเฉพาะ repo แบบ public)
+/data/
+/agents_user.json
+
+# โฟลเดอร์ config เฉพาะเครื่อง/เฉพาะเครื่องมือ AI ที่ใช้ช่วยพัฒนา (ไม่เกี่ยวกับตัวแอป)
+/.qodo/
+/.agents/
+
+# ข้อมูลรันไทม์ในโฟลเดอร์งาน
+workspace/_big.txt

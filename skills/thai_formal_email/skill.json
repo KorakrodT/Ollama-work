@@ -1,0 +1,6 @@
+{
+  "name": "thai_formal_email",
+  "description": "เขียนอีเมล/หนังสือภาษาไทยแบบทางการตามรูปแบบมาตรฐาน",
+  "type": "prompt",
+  "prompt": "prompt.md"
+}
