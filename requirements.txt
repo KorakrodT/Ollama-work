@@ -10,4 +10,5 @@ pythonnet>=3.0,<4.0 ; sys_platform == "win32"
 # แบบเงียบๆ เพราะ error ถูก except แล้ว print เฉยๆ)
 pystray>=0.19,<1.0 ; sys_platform == "win32"
 keyboard>=0.13,<1.0 ; sys_platform == "win32"
-Pillow>=10.0
+# AUDIT 2026-07-03: ใส่ขอบบน <12 กันเวอร์ชัน Pillow ใหม่ทำ API แตก (ให้สอดคล้อง dep อื่นที่ล็อกช่วง)
+Pillow>=10.0,<12

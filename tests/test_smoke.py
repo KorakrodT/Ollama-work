@@ -9,7 +9,6 @@ import io
 import json
 import os
 import sys
-import types
 import importlib
 from pathlib import Path
 
@@ -599,7 +598,7 @@ def test_skill_confirm_required_for_new_skill(tmp_path, monkeypatch):
 
     used_tools: list = []
     proposals: list = []
-    result = server._handle_tool_call(
+    server._handle_tool_call(
         skill_name, {}, used_tools, proposals,
         skill_names={skill_name}  # บอกว่านี่คือ skill
     )
@@ -1030,7 +1029,6 @@ def test_sched_due_logic():
 def test_run_schedule_writes_report(monkeypatch, tmp_path):
     """_run_schedule ต้องเขียนรายงานลง reports/ และแจ้งเตือนเมื่อมี proposal ที่ไม่ได้เขียน."""
     _stub_optional_deps()
-    import tools as T
     server = importlib.import_module("server")
 
     def fake_run_agent(agent_key, history, model, cowork=False, provider=None):

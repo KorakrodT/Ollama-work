@@ -68,12 +68,12 @@ def _force_utf8_streams() -> None:
 
 _force_utf8_streams()
 
-from agents import AGENTS, DEFAULT_AGENT
-import tools as T
-import skills_loader as SL
-import agent_store as AG
-import data_store as DS
-import winproc  # QUAL-1: no_window_kwargs() ที่ใช้ร่วมกับ tools.py
+from agents import AGENTS, DEFAULT_AGENT  # noqa: E402  # ต้องอยู่หลัง _force_utf8_streams()
+import tools as T  # noqa: E402
+import skills_loader as SL  # noqa: E402
+import agent_store as AG  # noqa: E402
+import data_store as DS  # noqa: E402
+import winproc  # noqa: E402  # QUAL-1: no_window_kwargs() ที่ใช้ร่วมกับ tools.py
 
 # OBS-1: log ลงไฟล์ data/app.log ด้วย — โหมด .exe (--windowed) ไม่มีคอนโซล
 # ถ้าไม่มีไฟล์ log แปลว่า warning/audit trail (SEC-3) และ traceback (D2) หายเงียบหมด
@@ -635,7 +635,9 @@ def _audio_worker(folder: str, recursive: bool, ext: str) -> None:
             sz = 0
         sized.append((p, sz))
         ek = (os.path.splitext(p)[1].lower() or "(ไม่มีนามสกุล)")
-        slot = by_type.setdefault(ek, [0, 0]); slot[0] += 1; slot[1] += sz
+        slot = by_type.setdefault(ek, [0, 0])
+        slot[0] += 1
+        slot[1] += sz
         total_bytes += sz
         if sz > 0:
             size_map.setdefault(sz, []).append(p)

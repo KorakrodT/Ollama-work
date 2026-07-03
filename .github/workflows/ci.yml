@@ -38,7 +38,9 @@ jobs:
         # ที่เรียก main() — compileall/pytest ตอนนั้นจับไม่ได้เพราะไม่มี syntax error และ
         # ไม่มี test เรียก main() ตรงๆ (เปิดหน้าต่างจริง เขียน test ตรงไม่คุ้ม) ตัว lint
         # นี้จับ pattern นี้ได้แบบ static ไม่ต้องรันโค้ดจริงเลย
-        run: python -m ruff check --select F server.py tools.py agents.py agent_store.py data_store.py skills_loader.py mcp_client.py knowledge_store.py winproc.py
+        # AUDIT 2026-07-03: เพิ่ม tests/ และ workspace/gen_official_doc.py เข้าขั้น lint ด้วย
+        # เดิมตกหล่น ทำให้ F401 (unused import) / F841 (unused var) ในเทสต์หลุดรอด
+        run: python -m ruff check --select F server.py tools.py agents.py agent_store.py data_store.py skills_loader.py mcp_client.py knowledge_store.py winproc.py tests/ workspace/gen_official_doc.py
 
       - name: Compile-check (จับ SyntaxError/ไฟล์ truncate ก่อน build)
         # ครอบทุกโมดูลซอร์ส รวม mcp_client.py / knowledge_store.py ที่เพิ่มมาทีหลัง

@@ -310,8 +310,10 @@ class SkillRegistry:
         out = []
         has_prompt = False
         for s in self.skills:
-            if s["type"] == "error": continue
-            if not self._is_allowed(s, allowed_categories): continue
+            if s["type"] == "error":
+                continue
+            if not self._is_allowed(s, allowed_categories):
+                continue
 
             if s["type"] in ("code", "both") and s["run"]:
                 out.append({"type": "function", "function": {
@@ -360,7 +362,8 @@ class SkillRegistry:
         groups = {}
         for s in filtered:
             cat = s.get("category", "General")
-            if cat not in groups: groups[cat] = []
+            if cat not in groups:
+                groups[cat] = []
             groups[cat].append(s)
 
         lines = ["คุณมี Skills พิเศษที่ผู้ใช้ติดตั้งไว้ดังนี้ (ให้พิจารณาเลือกใช้ให้เหมาะสม):"]

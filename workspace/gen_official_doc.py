@@ -297,7 +297,8 @@ def build_regulation(doc, s, head="ระเบียบ"):
         add_par(doc, para, font=font, align=J, indent_cm=2.5, space_after=4)
     for i, cl in enumerate(s.get("clauses", []), 1):
         if isinstance(cl, dict):
-            no = cl.get("no", str(i)); txt = cl.get("text", "")
+            no = cl.get("no", str(i))
+            txt = cl.get("text", "")
         else:
             no, txt = str(i), cl
         add_par(doc, "ข้อ %s  %s" % (no, txt), font=font, align=J, indent_cm=2.5, space_after=4)
