@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT))
 
 
 def _stub_optional_deps() -> None:
-    """เผื่ออนาคต/โมดูลเสริม — ปัจจุบัน server.py คุยกับ LM Studio ผ่าน urllib
+    """เผื่ออนาคต/โมดูลเสริม — ปัจจุบัน server.py คุยกับ Ollama ผ่าน urllib
     จึงไม่ต้องพึ่งแพ็กเกจ client ภายนอกแล้ว (no-op ที่ปลอดภัย)."""
     return None
 
@@ -167,15 +167,15 @@ def test_cowork_unlocks_arbitrary_workspace(monkeypatch, tmp_path):
 
 
 # --------------------------------------------------------------------------
-# 6) LM Studio backend + เครื่องมือตรวจไฟล์เสียงที่เพิ่มเข้ามา
+# 6) Ollama backend + เครื่องมือตรวจไฟล์เสียงที่เพิ่มเข้ามา
 # --------------------------------------------------------------------------
-def test_lmstudio_helpers_exist_and_fallback():
+def test_ollama_helpers_exist_and_fallback():
     _stub_optional_deps()
     server = importlib.import_module("server")
-    # โครงสร้าง LM Studio พร้อม และ fallback เมื่อ LM Studio ไม่เปิด
-    assert server.LMSTUDIO_BASE.endswith("/v1")
-    assert isinstance(server.lm_models(), list)        # ต่อไม่ได้ -> []
-    assert server.default_model()                       # อย่างน้อยได้ 'local-model'
+    # โครงสร้าง Ollama พร้อม และ fallback เมื่อ Ollama ไม่เปิด
+    assert server.OLLAMA_BASE.endswith("/v1")
+    assert isinstance(server.ollama_models(), list)     # ต่อไม่ได้ -> []
+    assert server.default_model()                        # อย่างน้อยได้ชื่อ fallback
 
 
 def test_audio_tools_registered():
@@ -236,7 +236,7 @@ def test_format_error_reply():
 
 
 def test_run_agent_handles_error_response(monkeypatch):
-    """LM Studio คืน {error:...} (เช่น context เกิน/โมเดลไม่โหลด) -> ต้องได้ reply ที่อ่านรู้เรื่อง ไม่ raise."""
+    """backend คืน {error:...} (เช่น context เกิน/โมเดลไม่โหลด) -> ต้องได้ reply ที่อ่านรู้เรื่อง ไม่ raise."""
     _stub_optional_deps()
     server = importlib.import_module("server")
     monkeypatch.setattr(server, "_openai_chat",

@@ -479,7 +479,7 @@ function showWelcome(){
   const a=state.agents.find(x=>x.key===state.agentKey);
   $("feedInner").innerHTML=`<div class="welcome"><div class="wlogo"><svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M12 2l1.7 6.6L20 10l-6.3 1.4L12 18l-1.7-6.6L4 10l6.3-1.4z"/></svg></div>
     <h2>สวัสดี! ${a?esc(a.title):""}</h2>
-    <p>ผู้ช่วย AI ที่รันบนเครื่องคุณผ่าน LM Studio — คุยได้ทั่วไป เขียนโค้ด จัดการไฟล์ในโฟลเดอร์งาน และตรวจไฟล์เสีย</p>
+    <p>ผู้ช่วย AI ที่รันบนเครื่องคุณผ่าน Ollama — คุยได้ทั่วไป เขียนโค้ด จัดการไฟล์ในโฟลเดอร์งาน และตรวจไฟล์เสีย</p>
     <div class="suggest">
       <button onclick="quick('ช่วยสรุปงานที่ทำได้บ้าง')">ทำอะไรได้บ้าง?</button>
       <button onclick="quick('ตรวจไฟล์เพลงเสียในโฟลเดอร์งานให้หน่อย')">ตรวจไฟล์เสีย</button>

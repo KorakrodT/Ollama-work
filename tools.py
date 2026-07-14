@@ -17,6 +17,7 @@ import datetime
 import glob
 import operator
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -829,6 +830,108 @@ def add_to_knowledge(doc_id: str, content: str) -> str:
 def search_knowledge(query: str) -> str:
     return knowledge_store.search_knowledge(query)
 
+
+# ---------------------------------------------------------------------------
+# Dev_brain — second brain ของนักพัฒนา (Obsidian vault) แบบอ่านอย่างเดียว
+# แอปนี้ "ต่อ" กับ brain ได้แค่ค้น/อ่านโน้ต .md — ไม่เขียน ไม่ลบ (การเขียนเข้า brain
+# มี protocol ของตัวเอง ดู E:\Dev_brain\CLAUDE.md) และไม่แตะ raw\_quarantine
+# (ของนอกที่ยังไม่สแกน prompt injection — ห้ามป้อนเข้าโมเดล)
+# ---------------------------------------------------------------------------
+DEV_BRAIN_PATH = os.environ.get("DEV_BRAIN_PATH", r"E:\Dev_brain")
+_BRAIN_SKIP_DIRS = {".obsidian", ".git", ".trash", "_quarantine"}
+BRAIN_NOTE_MAX_CHARS = 8000       # กันโน้ตยาวกินบริบทโมเดลหมด
+_BRAIN_SCAN_MAX_BYTES = 200_000   # ข้ามไฟล์ .md ที่ใหญ่ผิดปกติตอนค้น
+
+
+def _brain_root() -> str | None:
+    """root ของ brain ถ้ามีจริง (ตั้งผ่าน env DEV_BRAIN_PATH ได้)."""
+    root = os.path.abspath(DEV_BRAIN_PATH)
+    return root if os.path.isdir(root) else None
+
+
+def _brain_notes(root: str):
+    """generator ของ (fullpath, relpath) สำหรับทุกโน้ต .md ใน brain (ข้ามโฟลเดอร์ระบบ/quarantine)."""
+    for dirpath, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in _BRAIN_SKIP_DIRS]
+        for fn in files:
+            if fn.lower().endswith(".md"):
+                full = os.path.join(dirpath, fn)
+                yield full, os.path.relpath(full, root)
+
+
+def search_brain(query: str, top_k: int = 5) -> str:
+    """ค้นโน้ตใน Dev_brain ด้วย keyword overlap (แบบเดียวกับ knowledge_store)."""
+    root = _brain_root()
+    if not root:
+        return f"ไม่พบ Dev_brain ที่ {DEV_BRAIN_PATH} (ตั้ง env DEV_BRAIN_PATH ได้)"
+    q_tokens = set(re.findall(r"\w+", (query or "").lower()))
+    if not q_tokens:
+        return "ต้องระบุคำค้น"
+    try:
+        top_k = max(1, min(int(top_k), 10))
+    except (TypeError, ValueError):
+        top_k = 5
+    scored = []
+    for full, rel in _brain_notes(root):
+        try:
+            if os.path.getsize(full) > _BRAIN_SCAN_MAX_BYTES:
+                continue
+            with open(full, "r", encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+        except OSError:
+            continue
+        tokens = set(re.findall(r"\w+", text.lower()))
+        hit = q_tokens & tokens
+        if not hit:
+            continue
+        score = len(hit) / len(q_tokens)
+        # ชื่อไฟล์ตรงคำค้น = สัญญาณแรงกว่าเนื้อหา
+        name_tokens = set(re.findall(r"\w+", os.path.splitext(rel)[0].lower()))
+        score += 0.5 * len(q_tokens & name_tokens)
+        # snippet: บรรทัดแรกที่มีคำค้น
+        snippet = ""
+        for line in text.splitlines():
+            low = line.lower()
+            if any(t in low for t in hit):
+                snippet = line.strip()[:200]
+                break
+        scored.append((score, rel, snippet))
+    if not scored:
+        return f"ไม่พบโน้ตที่ตรงกับ '{query}' ใน Dev_brain"
+    scored.sort(key=lambda x: x[0], reverse=True)
+    lines = [f"ผลค้นหา Dev_brain สำหรับ '{query}' ({min(len(scored), top_k)} รายการ):"]
+    for score, rel, snippet in scored[:top_k]:
+        lines.append(f"- {rel}" + (f" — {snippet}" if snippet else ""))
+    lines.append("\nอ่านทั้งโน้ตด้วย read_brain_note(path)")
+    return "\n".join(lines)
+
+
+def read_brain_note(path: str) -> str:
+    """อ่านโน้ตหนึ่งไฟล์จาก Dev_brain (path แบบ relative จาก root ของ brain)."""
+    root = _brain_root()
+    if not root:
+        return f"ไม่พบ Dev_brain ที่ {DEV_BRAIN_PATH} (ตั้ง env DEV_BRAIN_PATH ได้)"
+    rel = (path or "").replace("\\", os.sep).replace("/", os.sep).lstrip(os.sep)
+    full = os.path.abspath(os.path.join(root, rel))
+    # path jail: ห้ามหลุดออกนอก brain + ห้ามอ่านของใน quarantine
+    if not (full == root or full.startswith(root + os.sep)):
+        return "ปฏิเสธ: path อยู่นอก Dev_brain"
+    rel_parts = os.path.relpath(full, root).split(os.sep)
+    if any(part in _BRAIN_SKIP_DIRS for part in rel_parts):
+        return "ปฏิเสธ: โฟลเดอร์นี้ไม่เปิดให้อ่าน (ระบบ/quarantine)"
+    if not os.path.isfile(full):
+        return f"ไม่พบโน้ต '{path}' ใน Dev_brain"
+    if not full.lower().endswith((".md", ".txt")):
+        return "อ่านได้เฉพาะไฟล์ .md/.txt"
+    try:
+        with open(full, "r", encoding="utf-8", errors="ignore") as f:
+            text = f.read(BRAIN_NOTE_MAX_CHARS + 1)
+    except OSError as e:
+        return f"อ่านไม่สำเร็จ: {e}"
+    if len(text) > BRAIN_NOTE_MAX_CHARS:
+        text = text[:BRAIN_NOTE_MAX_CHARS] + "\n\n[... ตัดที่ {} ตัวอักษร ...]".format(BRAIN_NOTE_MAX_CHARS)
+    return f"# Dev_brain: {os.path.relpath(full, root)}\n\n{text}"
+
 # ---------------------------------------------------------------------------
 # ลงทะเบียน
 # ---------------------------------------------------------------------------
@@ -845,6 +948,8 @@ TOOLS = {
     "install_ffmpeg": install_ffmpeg,
     "add_to_knowledge": add_to_knowledge,
     "search_knowledge": search_knowledge,
+    "search_brain": search_brain,
+    "read_brain_note": read_brain_note,
     "remember": remember,
 }
 
@@ -932,6 +1037,24 @@ TOOL_SCHEMAS = [
         "parameters": {"type": "object", "properties": {
             "query": {"type": "string", "description": "The search query (keywords, questions)"}
         }, "required": ["query"]}}},
+    {"type": "function", "function": {
+        "name": "search_brain",
+        "description": ("ค้นหาความรู้ใน Dev_brain (second brain สายวิศวกรรมซอฟต์แวร์ของผู้ใช้ — "
+                        "โน้ต Obsidian เรื่องเทคนิคเขียนโค้ด, AI agents, frameworks ฯลฯ) "
+                        "ใช้เมื่อคำถามเกี่ยวกับความรู้/โปรเจกต์ที่ผู้ใช้เคยศึกษาไว้ "
+                        "ได้ผลเป็นรายชื่อโน้ตที่เกี่ยวข้อง แล้วอ่านต่อด้วย read_brain_note"),
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string", "description": "คำค้น (keyword หรือคำถามสั้นๆ)"},
+            "top_k": {"type": "integer", "description": "จำนวนผลลัพธ์สูงสุด (ดีฟอลต์ 5)"}},
+            "required": ["query"]}}},
+    {"type": "function", "function": {
+        "name": "read_brain_note",
+        "description": ("อ่านโน้ตหนึ่งไฟล์จาก Dev_brain (ใช้ path ที่ได้จาก search_brain) "
+                        "— อ่านอย่างเดียว แก้ไขไม่ได้"),
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string",
+                     "description": "path ของโน้ต relative จาก root ของ brain เช่น 'wiki/index.md'"}},
+            "required": ["path"]}}},
     {"type": "function", "function": {
         "name": "remember",
         "description": ("จดข้อมูล/ข้อตกลง/ความชอบสำคัญของผู้ใช้ลงไฟล์ความจำ (_memory.md) "

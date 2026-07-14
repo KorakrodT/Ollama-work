@@ -35,6 +35,7 @@ _OLD_PATH = os.path.join(_BASE, "agents_user.json")  # ของเดิม ก
 AVAILABLE_TOOLS = [
     "calculator", "get_current_time", "list_files",
     "read_file", "write_file", "fetch_url", "remember",
+    "search_brain", "read_brain_note",
 ]
 
 _FIELDS = ("title", "description", "system", "tools", "skill_categories")

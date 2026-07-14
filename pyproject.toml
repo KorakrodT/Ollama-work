@@ -1,0 +1,30 @@
+# โปรเจกต์ LM Co-work — คอนฟิกเครื่องมือพัฒนา (lint/test)
+# ไม่ได้ทำเป็นแพ็กเกจติดตั้ง (ยังรันด้วย `py server.py`) ใส่ไว้เพื่อ "ล็อกมาตรฐาน"
+# ให้ ruff/pytest ทำงานเหมือนกันทั้งบนเครื่อง dev และใน CI
+
+[tool.ruff]
+# ความยาวบรรทัด: โค้ด+คอมเมนต์ไทยยาวได้บ้าง ตั้ง 100 พอดี ไม่บีบจนต้องตัดคำไทย
+line-length = 100
+target-version = "py310"
+# โฟลเดอร์ที่ไม่ใช่ซอร์สหลัก — งานชั่วคราว/ผลลัพธ์ build ไม่ต้อง lint
+extend-exclude = [
+    "build",
+    "dist",
+    "models",
+    "workspace",
+    ".ruff_cache",
+    ".pytest_cache",
+]
+
+[tool.ruff.lint]
+# มาตรฐานหลักคือ pyflakes (F) — จับบั๊กจริง เช่น import ไม่ใช้, ตัวแปร shadow, undefined
+# บวกกลุ่ม E/W ที่เป็น logic/ความปลอดภัยของโครงสร้าง (ไม่รวม E501 line-too-long ที่เป็น
+# style ล้วน เพราะคอมเมนต์อธิบายเหตุผลภาษาไทยหลายจุดยาวโดยตั้งใจ)
+select = ["F", "E4", "E7", "E9", "W6"]
+# ปล่อยให้ except Exception ได้ (ทั้งโปรเจกต์ใช้ pattern นี้พร้อม # noqa: BLE001 อยู่แล้ว)
+ignore = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
