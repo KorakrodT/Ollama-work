@@ -217,6 +217,38 @@ def get_skill_data(name: str, skills_dir=SKILLS_DIR) -> dict | None:
     return data
 
 
+def _find_skill_md(folder: str) -> str | None:
+    """หาไฟล์ SKILL.md ในโฟลเดอร์ (ตัวพิมพ์ใหญ่/เล็กไม่เป็นไร)."""
+    for fn in os.listdir(folder):
+        if fn.lower() == "skill.md":
+            return os.path.join(folder, fn)
+    return None
+
+
+def _parse_skill_md(path: str) -> tuple[dict, str]:
+    """แยก YAML frontmatter อย่างง่าย (key: value บรรทัดเดียว) กับเนื้อหา markdown.
+
+    ไม่ใช้ไลบรารี yaml — รองรับแค่ scalar บรรทัดเดียวพอ (name/description/category)
+    ซึ่งครอบคลุม SKILL.md ปกติ; key ที่ซับซ้อนกว่านั้นถูกข้ามเฉย ๆ ไม่ error.
+    """
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        text = f.read()
+    meta: dict = {}
+    body = text
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end > 0:
+            for line in text[3:end].splitlines():
+                if ":" not in line:
+                    continue
+                key, _, value = line.partition(":")
+                key, value = key.strip(), value.strip().strip("'\"")
+                if key and value and "\n" not in value:
+                    meta[key] = value
+            body = text[end + 4:].lstrip("\n")
+    return meta, body
+
+
 def import_or_convert_skill(src_folder: str, skills_dir=SKILLS_DIR) -> tuple[bool, str]:
     """นำเข้าหรือแปลงโฟลเดอร์ให้เป็น Skill"""
     if not os.path.isdir(src_folder):
@@ -243,6 +275,37 @@ def import_or_convert_skill(src_folder: str, skills_dir=SKILLS_DIR) -> tuple[boo
             return True, f"นำเข้า Skill '{slug}' สำเร็จ"
         except Exception as e:
             return False, f"เกิดข้อผิดพลาดในการนำเข้า: {e}"
+
+    # แบบที่ 1.5: โฟลเดอร์รูปแบบ SKILL.md (มาตรฐานที่ Claude Code / Mesh LLM ใช้)
+    # — frontmatter (name/description) + เนื้อหา markdown -> แปลงเป็น Prompt Skill
+    skill_md = _find_skill_md(src_folder)
+    if skill_md:
+        try:
+            meta_fm, body = _parse_skill_md(skill_md)
+            name = _slug(meta_fm.get("name", "")) or slug
+            # ชื่อจาก frontmatter อาจชนกับ skill เดิม -> วนหาชื่อว่างเหมือน slug ข้างบน
+            dest_folder = os.path.join(skills_dir, name)
+            counter = 1
+            while os.path.exists(dest_folder):
+                dest_folder = os.path.join(skills_dir, f"{name}_{counter}")
+                name = os.path.basename(dest_folder)
+                counter += 1
+            os.makedirs(dest_folder, exist_ok=True)
+            meta = {
+                "name": name,
+                "description": meta_fm.get("description")
+                or f"skill จาก SKILL.md ({os.path.basename(src_folder)})",
+                "type": "prompt",
+                "category": meta_fm.get("category", "Imported"),
+                "prompt": "prompt.md",
+            }
+            with open(os.path.join(dest_folder, "prompt.md"), "w", encoding="utf-8") as f:
+                f.write(body)
+            with open(os.path.join(dest_folder, "skill.json"), "w", encoding="utf-8") as f:
+                json.dump(meta, f, ensure_ascii=False, indent=2)
+            return True, f"นำเข้า SKILL.md เป็น Skill '{name}' สำเร็จ"
+        except Exception as e:  # noqa: BLE001
+            return False, f"เกิดข้อผิดพลาดในการนำเข้า SKILL.md: {e}"
 
     # แบบที่ 2: แปลงโฟลเดอร์ธรรมดาเป็น Prompt Skill
     try:

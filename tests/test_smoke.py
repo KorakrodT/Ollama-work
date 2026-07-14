@@ -268,6 +268,174 @@ def test_brain_tools_handle_missing_vault(monkeypatch, tmp_path):
 
 
 # --------------------------------------------------------------------------
+# 6.6) Guardrails (port จาก Mesh LLM): strip think / rescue tool call / empty retry
+# --------------------------------------------------------------------------
+def test_strip_thinking_blocks():
+    _stub_optional_deps()
+    import guardrails as GR
+    assert GR.strip_thinking("<think>คิดในใจ</think>คำตอบจริง") == "คำตอบจริง"
+    assert GR.strip_thinking("ก่อน[THINK]x[/THINK]หลัง") == "ก่อนหลัง"
+    # tag ไม่ปิด -> ทิ้งส่วนที่เหลือ (ถือเป็น reasoning ทั้งหมด)
+    assert GR.strip_thinking("คำตอบ<think>ยังคิดไม่จบ") == "คำตอบ"
+    assert GR.strip_thinking("") == ""
+
+
+def test_rescue_tool_calls_from_text_variants():
+    _stub_optional_deps()
+    import guardrails as GR
+    known = {"calculator", "read_file"}
+
+    # 1) JSON เปล่าทั้งก้อน
+    out = GR.rescue_tool_calls('{"name": "calculator", "arguments": {"expression": "1+1"}}', known)
+    assert out and out[0]["function"]["name"] == "calculator"
+    assert json.loads(out[0]["function"]["arguments"]) == {"expression": "1+1"}
+    # 2) fenced code block + arguments เป็น JSON string
+    out = GR.rescue_tool_calls(
+        'เรียกเครื่องมือนี้:\n```json\n{"name": "read_file", "arguments": "{\\"path\\": \\"a.txt\\"}"}\n```',
+        known)
+    assert out and out[0]["function"]["name"] == "read_file"
+    # 3) JSON ฝังกลางประโยคสั้น
+    out = GR.rescue_tool_calls('ขอใช้ {"name": "calculator", "arguments": {"expression": "2*3"}} นะ', known)
+    assert out and out[0]["function"]["name"] == "calculator"
+    # 4) รูปแบบ <tool_call> tag (Qwen3/Hermes)
+    out = GR.rescue_tool_calls(
+        '<tool_call>{"name": "calculator", "arguments": {"expression": "5-2"}}</tool_call>', known)
+    assert out and out[0]["function"]["name"] == "calculator"
+    # 5) รูปแบบ <function=...><parameter=...> (Qwen-coder)
+    out = GR.rescue_tool_calls(
+        '<function=read_file><parameter=path>notes.md</parameter></function>', known)
+    assert out and out[0]["function"]["name"] == "read_file"
+    assert json.loads(out[0]["function"]["arguments"]) == {"path": "notes.md"}
+    # 6) tool_calls ห่อเป็น list
+    out = GR.rescue_tool_calls(
+        '{"tool_calls": [{"function": {"name": "calculator", "arguments": {"expression": "7"}}}]}',
+        known)
+    assert out and len(out) == 1
+
+
+def test_rescue_tool_calls_rejects_unknown_and_prose():
+    _stub_optional_deps()
+    import guardrails as GR
+    known = {"calculator"}
+    # ชื่อ tool ไม่มีจริง -> ต้องไม่กู้ (ปล่อยเป็นข้อความ)
+    assert GR.rescue_tool_calls('{"name": "rm_rf", "arguments": {}}', known) is None
+    # ข้อความธรรมดา -> None
+    assert GR.rescue_tool_calls("สวัสดีครับ วันนี้อากาศดี", known) is None
+    # ไม่มี tool ให้ใช้เลย -> None เสมอ
+    assert GR.rescue_tool_calls('{"name": "calculator", "arguments": {}}', set()) is None
+    # JSON ทั่วไปที่ไม่ใช่รูป tool call -> None
+    assert GR.rescue_tool_calls('{"result": 42, "status": "ok"}', known) is None
+
+
+def test_run_agent_rescues_textual_tool_call(monkeypatch):
+    """โมเดลพิมพ์ tool call เป็นข้อความ -> guardrails กู้แล้วรันเครื่องมือจริง."""
+    _stub_optional_deps()
+    server = importlib.import_module("server")
+    AR = importlib.import_module("agent_runtime")
+    responses = [
+        {"choices": [{"message": {"content":
+            '<think>ต้องคำนวณ</think>{"name": "calculator", "arguments": {"expression": "2+3"}}',
+            "tool_calls": None}}]},
+        {"choices": [{"message": {"content": "ได้ 5 ครับ", "tool_calls": None}}]},
+    ]
+    monkeypatch.setattr(AR, "_openai_chat", lambda *a, **k: responses.pop(0))
+    result = server.run_agent("general", [{"role": "user", "content": "2+3 เท่าไร"}], "m")
+    assert "calculator" in result["tools"]      # เครื่องมือถูกเรียกจริง
+    assert result["reply"] == "ได้ 5 ครับ"
+
+
+def test_run_agent_strips_thinking_from_reply(monkeypatch):
+    _stub_optional_deps()
+    server = importlib.import_module("server")
+    AR = importlib.import_module("agent_runtime")
+    monkeypatch.setattr(AR, "_openai_chat", lambda *a, **k: {
+        "choices": [{"message": {"content": "<think>เดา ๆ</think>คำตอบสุดท้าย",
+                                 "tool_calls": None}}]})
+    result = server.run_agent("general", [{"role": "user", "content": "หวัดดี"}], "m")
+    assert result["reply"] == "คำตอบสุดท้าย"
+
+
+def test_run_agent_retries_empty_output_with_nudge(monkeypatch):
+    """ตอบว่าง -> retry พร้อม system nudge; ครั้งถัดมาตอบปกติ -> ได้คำตอบ."""
+    _stub_optional_deps()
+    server = importlib.import_module("server")
+    AR = importlib.import_module("agent_runtime")
+    seen_nudges = []
+    responses = [
+        {"choices": [{"message": {"content": "<think>อืม</think>", "tool_calls": None}}]},
+        {"choices": [{"message": {"content": "มาแล้วครับ", "tool_calls": None}}]},
+    ]
+
+    def fake_chat(base_url, api_key, model, messages, tools):
+        seen_nudges.append(any(m.get("role") == "system" and "empty" in m.get("content", "")
+                               for m in messages))
+        return responses.pop(0)
+
+    monkeypatch.setattr(AR, "_openai_chat", fake_chat)
+    result = server.run_agent("general", [{"role": "user", "content": "ว่าไง"}], "m")
+    assert result["reply"] == "มาแล้วครับ"
+    assert seen_nudges == [False, True]         # รอบ retry ต้องมี nudge แนบไป
+
+
+def test_run_agent_gives_up_after_empty_retries(monkeypatch):
+    _stub_optional_deps()
+    import guardrails as GR
+    server = importlib.import_module("server")
+    AR = importlib.import_module("agent_runtime")
+    calls = {"n": 0}
+
+    def always_empty(*a, **k):
+        calls["n"] += 1
+        return {"choices": [{"message": {"content": "", "tool_calls": None}}]}
+
+    monkeypatch.setattr(AR, "_openai_chat", always_empty)
+    result = server.run_agent("general", [{"role": "user", "content": "ว่าไง"}], "m")
+    assert "ว่างเปล่า" in result["reply"]
+    assert calls["n"] == GR.MAX_GUARDRAIL_RETRIES + 1   # รอบแรก + retry ตาม budget
+
+
+# --------------------------------------------------------------------------
+# 6.7) SKILL.md import + โหมด --headless
+# --------------------------------------------------------------------------
+def test_import_skill_md_folder(tmp_path):
+    """โฟลเดอร์ที่มี SKILL.md (frontmatter + เนื้อหา) -> แปลงเป็น prompt skill."""
+    _stub_optional_deps()
+    import skills_loader as SL
+    src = tmp_path / "my-skill"
+    src.mkdir()
+    (src / "SKILL.md").write_text(
+        "---\nname: word-counter\ndescription: นับคำในข้อความ\n---\n\n# วิธีนับคำ\nแยกด้วยช่องว่าง",
+        encoding="utf-8")
+    ok, msg = SL.import_or_convert_skill(str(src), skills_dir=str(tmp_path / "skills"))
+    assert ok, msg
+    dest = tmp_path / "skills" / "word-counter"
+    meta = json.loads((dest / "skill.json").read_text(encoding="utf-8"))
+    assert meta["type"] == "prompt"
+    assert meta["description"] == "นับคำในข้อความ"
+    body = (dest / "prompt.md").read_text(encoding="utf-8")
+    assert "วิธีนับคำ" in body and "---" not in body.split("\n")[0]
+
+
+def test_import_skill_md_without_frontmatter(tmp_path):
+    """SKILL.md ไม่มี frontmatter -> ใช้ชื่อโฟลเดอร์ ไม่ระเบิด."""
+    _stub_optional_deps()
+    import skills_loader as SL
+    src = tmp_path / "plain_skill"
+    src.mkdir()
+    (src / "skill.md").write_text("แค่เนื้อหาเฉย ๆ", encoding="utf-8")
+    ok, msg = SL.import_or_convert_skill(str(src), skills_dir=str(tmp_path / "skills"))
+    assert ok, msg
+    assert (tmp_path / "skills" / "plain_skill" / "prompt.md").is_file()
+
+
+def test_headless_flag_detection():
+    _stub_optional_deps()
+    server = importlib.import_module("server")
+    assert server._headless_requested(["server.py", "--headless"])
+    assert not server._headless_requested(["server.py"])
+
+
+# --------------------------------------------------------------------------
 # 7) A1: run_agent ต้องทนต่อ response ผิดรูปแบบ (กัน KeyError ระเบิดเงียบ)
 # --------------------------------------------------------------------------
 def test_extract_message_normal_response():

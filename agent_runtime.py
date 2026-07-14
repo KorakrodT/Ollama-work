@@ -14,6 +14,7 @@ import logging
 import threading
 
 import agent_store as AG
+import guardrails as GR
 import skills_loader as SL
 import tools as T
 from agents import AGENTS, DEFAULT_AGENT
@@ -231,12 +232,17 @@ def run_agent(agent_key: str, history: list, model: str,
     messages = [{"role": "system", "content": sys_prompt}]
     messages += [{"role": h.get("role", "user"), "content": h.get("content", "")}
                  for h in history]
+    # GR: ชื่อ tool ทั้งหมดที่ agent นี้เรียกได้จริง — ใช้ตัดสินว่า rescue ข้อความได้ไหม
+    schema_names = {s["function"]["name"] for s in tool_schemas}
+    guard_retries = 0
+    pending_nudge: list[dict] = []   # system nudge แนบเฉพาะ request รอบ retry
     for _ in range(MAX_STEPS):
         if _is_cancelled():
             return {"reply": "⛔ ยกเลิกแล้ว", "tools": used_tools, "proposals": proposals,
                     "cancelled": True}
         try:
-            resp = _openai_chat(base_url, api_key, model, messages, tool_schemas)
+            resp = _openai_chat(base_url, api_key, model, messages + pending_nudge,
+                                tool_schemas)
         except Exception as e:  # noqa: BLE001 — Ollama ยังไม่เปิด/ไม่มีโมเดล
             _log.warning("_openai_chat failed: %s", e, exc_info=True)
             # self-healing: ถ้าเป็น backend Ollama ลองสตาร์ต headless แล้วลองใหม่ครั้งเดียว
@@ -255,13 +261,33 @@ def run_agent(agent_key: str, history: list, model: str,
         if msg is None:
             # response ผิดรูปแบบ/เป็น error (เช่น context เกิน, โมเดลไม่โหลด) -> แจ้งให้ชัด
             return {"reply": _format_error_reply(resp), "tools": used_tools, "proposals": proposals}
+        pending_nudge = []
         calls = msg.get("tool_calls")
-        am = {"role": "assistant", "content": msg.get("content") or ""}
+        # GR-1: ตัดบล็อกความคิด (<think>/[THINK]) ออกจากข้อความที่ผู้ใช้จะเห็น
+        visible = GR.strip_thinking(msg.get("content") or "")
+        # GR-2: โมเดล "เล่า" tool call เป็นข้อความ -> กู้กลับเป็น tool call จริง
+        if not calls and visible:
+            rescued = GR.rescue_tool_calls(visible, schema_names)
+            if rescued:
+                _log.info("guardrails: rescued %d tool call(s) from plain text", len(rescued))
+                calls = rescued
+                visible = ""            # ข้อความคือ tool call ที่หลงรูป — ไม่ใช่คำตอบ
+        # GR-3: ตอบว่างเปล่า (มักเพราะทั้งก้อนเป็น think block) -> retry พร้อม nudge
+        if not calls and not visible:
+            if guard_retries < GR.MAX_GUARDRAIL_RETRIES:
+                guard_retries += 1
+                pending_nudge = [GR.nudge_message("empty_output")]
+                _log.info("guardrails: empty output, retry %d/%d",
+                          guard_retries, GR.MAX_GUARDRAIL_RETRIES)
+                continue
+            return {"reply": "⚠️ โมเดลตอบกลับมาว่างเปล่า — ลองถามใหม่หรือเปลี่ยนโมเดลดูนะครับ",
+                    "tools": used_tools, "proposals": proposals}
+        am = {"role": "assistant", "content": visible}
         if calls:
             am["tool_calls"] = calls
         messages.append(am)
         if not calls:
-            return {"reply": msg.get("content") or "", "tools": used_tools, "proposals": proposals}
+            return {"reply": visible, "tools": used_tools, "proposals": proposals}
         for tc in calls:
             if _is_cancelled():
                 return {"reply": "⛔ ยกเลิกแล้ว", "tools": used_tools, "proposals": proposals,
@@ -272,7 +298,9 @@ def run_agent(agent_key: str, history: list, model: str,
             try:
                 args = raw if isinstance(raw, dict) else json.loads(raw or "{}")
             except ValueError as e:
-                err_msg = f"⚠️ Error parsing tool arguments: {e}. Please provide valid JSON."
+                # GR: บอกโมเดลชัด ๆ ว่าพลาดอะไร + contract ที่ต้องทำ (แบบ retry_nudge ของ mesh)
+                err_msg = (f"⚠️ Error parsing tool arguments: {e}. "
+                           + GR.nudge_message("invalid_arguments")["content"])
                 messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": err_msg})
                 continue
             result = _handle_tool_call(fname, args, used_tools, proposals, skill_names)

@@ -8,6 +8,8 @@ server.py — UI แบบหน้าต่างสไตล์ Claude desktop
   - แนบไฟล์: อัปโหลดไฟล์ข้อความเข้าโฟลเดอร์งานให้ AI อ่าน
 
 รัน:   py server.py    (หรือดับเบิลคลิก run-ui.bat)
+       py server.py --headless    (ไม่เปิดหน้าต่าง UI — รันเป็นบริการเบื้องหลัง
+       เหมาะกับใช้คู่ scheduler/เรียกผ่าน API; เปิดหน้าเว็บเองได้ที่ URL ที่พิมพ์บอก)
 """
 
 from __future__ import annotations
@@ -808,6 +810,11 @@ def _apply_window_icon(title: str = "LM Co-work") -> None:
         _log.debug("_apply_window_icon: ตั้งไอคอนไม่สำเร็จ", exc_info=True)
 
 
+def _headless_requested(argv: list[str]) -> bool:
+    """--headless: เสิร์ฟ API/scheduler โดยไม่เปิดหน้าต่าง UI (แยกเป็นฟังก์ชันให้เทสต์ได้)."""
+    return "--headless" in argv
+
+
 def main():
     # ให้ Windows มองแอปนี้เป็นแอปของตัวเอง (ไม่จัดกลุ่ม/ใช้ไอคอนของ host process อื่น)
     # ต้องเรียกก่อนสร้างหน้าต่าง — มีผลกับไอคอน+การ pin บน taskbar
@@ -864,6 +871,17 @@ def main():
     print(f"🤖 LM Co-work พร้อมแล้ว -> {url}"
           + (f"  (พอร์ต {PORT} ชน เลื่อนไปใช้ {ACTUAL_PORT})" if ACTUAL_PORT != PORT else ""))
     print(f"   โฟลเดอร์งานเริ่มต้น: {T.WORKSPACE}")
+
+    # โหมด headless (แนวคิดจาก `mesh-llm serve --headless`): เสิร์ฟ API + scheduler
+    # ต่อไปโดยไม่เปิดหน้าต่าง/เบราว์เซอร์ — ปิดด้วย Ctrl+C
+    if _headless_requested(sys.argv):
+        print(f"🕶️ โหมด headless: ไม่เปิดหน้าต่าง UI — เปิดเองได้ที่ {url} (Ctrl+C เพื่อปิด)")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nปิดเซิร์ฟเวอร์แล้ว 👋")
+        return
 
     # เปิดเป็นหน้าต่างโปรแกรมจริง (pywebview)
     try:
