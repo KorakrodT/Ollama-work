@@ -1,4 +1,4 @@
-# แอปคุยกับโมเดลผ่าน LM Studio (OpenAI-compatible) ด้วย urllib ในไลบรารีมาตรฐาน
+# แอปคุยกับโมเดลผ่าน Ollama (OpenAI-compatible) ด้วย urllib ในไลบรารีมาตรฐาน
 # จึงไม่ต้องใช้แพ็กเกจ client เพิ่ม
 pywebview>=5.0,<6.0
 # จำเป็นบน Windows: pywebview backend edgechromium เรียกใช้ผ่าน .NET (clr)
